@@ -8,11 +8,16 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
 <link rel="manifest" href="manifest.json" />
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js');
-  }
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered', reg))
+      .catch(err => console.error(err));
+  });
+}
 </script>
-  <style>
+  
+<style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -550,6 +555,24 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
 .log-wrap::-webkit-scrollbar { height: 4px; }
 .log-wrap::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 4px; }
 
+
+/* ── CSV Export/Import modal ── */
+.csv-modal-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 12px; }
+.csv-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.csv-label { font-size: 11px; color: var(--text-tertiary); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.csv-input { padding: 7px 10px; border: 1px solid var(--border-md); border-radius: var(--radius-md);
+  background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; font-size: 13px; outline: none; }
+.csv-input:focus { border-color: var(--green-mid); }
+.csv-section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.csv-import-drop {
+  border: 2px dashed var(--border-md); border-radius: var(--radius-md);
+  padding: 20px; text-align: center; cursor: pointer; transition: border-color .2s;
+  color: var(--text-tertiary); font-size: 13px;
+}
+.csv-import-drop:hover, .csv-import-drop.dragover { border-color: var(--green-mid); color: var(--green-dark); }
+.csv-import-preview { font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+
 </style>
 </head>
 <body>
@@ -590,6 +613,7 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
         <div class="log-count" id="log-count">0 entries</div>
       </div>
       <div class="log-header-actions">
+        <button class="btn" onclick="openCSVModal()"><i class="ti ti-file-text"></i> CSV</button>
         <button class="btn" onclick="copyLog()" id="copy-btn"><i class="ti ti-clipboard-copy"></i> Copy</button>
         <button class="btn" onclick="clearLog()"><i class="ti ti-trash"></i> Clear log</button>
         <button class="btn btn-primary" onclick="exportXLSX()"><i class="ti ti-file-spreadsheet"></i> Download XLSX</button>
@@ -786,6 +810,60 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     </button>
   </div>
 </div>
+
+<!-- CSV Export/Import modal -->
+<div class="modal-overlay hidden" id="csv-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-file-text" style="vertical-align:-2px;margin-right:6px"></i>CSV Export / Import</div>
+      <button class="btn-icon" onclick="document.getElementById('csv-modal').classList.add('hidden')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <!-- Export -->
+      <div class="csv-section-title"><i class="ti ti-download" style="font-size:12px;margin-right:4px"></i>Export Log to CSV</div>
+      <div class="csv-modal-row">
+        <div class="csv-field">
+          <label class="csv-label">From date</label>
+          <input type="date" class="csv-input" id="csv-from" />
+        </div>
+        <div class="csv-field">
+          <label class="csv-label">To date</label>
+          <input type="date" class="csv-input" id="csv-to" />
+        </div>
+        <button class="btn btn-primary" onclick="exportCSV()" style="flex-shrink:0">
+          <i class="ti ti-download"></i> Export
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:16px">Leave dates blank to export all records.</div>
+
+      <!-- Import -->
+      <div class="csv-section-title"><i class="ti ti-upload" style="font-size:12px;margin-right:4px"></i>Import Log from CSV</div>
+      <div class="csv-modal-row">
+        <div class="csv-field">
+          <label class="csv-label">Import from date</label>
+          <input type="date" class="csv-input" id="csv-import-from" />
+        </div>
+        <div class="csv-field">
+          <label class="csv-label">Import to date</label>
+          <input type="date" class="csv-input" id="csv-import-to" />
+        </div>
+      </div>
+      <div class="csv-import-drop" id="csv-drop-zone"
+        onclick="document.getElementById('csv-file-input').click()"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="handleCSVDrop(event)">
+        <i class="ti ti-file-upload" style="font-size:24px;display:block;margin-bottom:6px;opacity:.5"></i>
+        Click to choose a CSV file or drag &amp; drop here
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none" onchange="handleCSVFile(this)" />
+      </div>
+      <div class="csv-import-preview" id="csv-import-preview"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="document.getElementById('csv-modal').classList.add('hidden')">Close</button>
+    </div>
+  </div>
+</div>
 <!-- Break timer -->
 <div class="break-widget" id="break-widget">
   <div class="break-label">
@@ -902,26 +980,13 @@ function refreshAllTimers() {
 
 // ── Freeze on hide / shutdown ──────────────────────────────────────────────────
 function freezeAllTimers() {
-  const now = Date.now();
-  let changed = false;
-  tasks.forEach(task => {
-    if (task.status === 'running' && task.segmentStart !== null) {
-      task.accumulatedMs += now - task.segmentStart;
-      task.segmentStart = now; // reset segment start to now so on wake elapsed is correct
-      changed = true;
-    }
-  });
-  // Freeze break segment
-  const dateStr = todayStr();
-  const data = getBreakData();
-  const day = data[dateStr] || { segments: [], currentStart: null };
-  if (day.currentStart !== null) {
-    day.segments.push({ start: day.currentStart, end: now });
-    day.currentStart = null;
-    data[dateStr] = day;
-    saveBreakData(data);
-  }
-  if (changed) saveState();
+  // Wall-clock timers: segmentStart is an absolute timestamp so elapsed is
+  // always correct after wake — no need to bank anything on hide.
+  // We only save state so localStorage has the latest accumulatedMs for
+  // tasks that were paused/idle.
+  saveState();
+  // Keep break segment open — it will auto-accumulate until a task resumes.
+  // (Break currentStart is already a wall-clock timestamp.)
 }
 
 const SLEEP_AUTO_PAUSE_MS = 15 * 60 * 1000; // 15 minutes
@@ -994,12 +1059,8 @@ document.addEventListener('visibilitychange', () => {
       }, MISSED_LOG_NOTIFY_MS);
 
     } else {
-      // Short wake (screen unlock etc) — just restore segment starts
-      tasks.forEach(task => {
-        if (task.status === 'running' && task.segmentStart !== null) {
-          task.segmentStart = now;
-        }
-      });
+      // Short wake — segmentStart is already wall-clock, nothing to reset.
+      // elapsed = accumulatedMs + (Date.now() - segmentStart) is always correct.
     }
 
     refreshAllTimers();
@@ -1325,6 +1386,49 @@ function getCustomEndTimestamp() {
   return d.getTime();
 }
 
+
+// ── Deduct a worked time range from break segments ────────────────────────────
+// When a task is logged with custom start/end, that time was break → remove it.
+function deductFromBreak(workStart, workEnd) {
+  if (!workStart || !workEnd || workEnd <= workStart) return;
+  const dateStr = todayStr();
+  const data = getBreakData();
+  const day = data[dateStr] || { segments: [], currentStart: null };
+  const newSegments = [];
+
+  // Close open segment up to now for processing
+  const allSegs = [...day.segments];
+  if (day.currentStart !== null) {
+    allSegs.push({ start: day.currentStart, end: Date.now(), _wasOpen: true });
+  }
+
+  let reopenBreak = false;
+  allSegs.forEach(seg => {
+    const s = seg.start, e = seg._wasOpen ? Date.now() : seg.end;
+    if (e <= workStart || s >= workEnd) {
+      // No overlap — keep as-is
+      newSegments.push({ start: s, end: e });
+    } else {
+      // Has overlap — split
+      if (s < workStart) newSegments.push({ start: s, end: workStart });
+      if (e > workEnd) {
+        if (seg._wasOpen) {
+          reopenBreak = true; // resume break after work period
+          day.currentStart = workEnd;
+        } else {
+          newSegments.push({ start: workEnd, end: e });
+        }
+      }
+    }
+  });
+
+  day.segments = newSegments.filter(s => s.end > s.start);
+  if (!reopenBreak) day.currentStart = null;
+  data[dateStr] = day;
+  saveBreakData(data);
+  renderBreakWidget();
+}
+
 function submitComplete() {
   const id = pendingCompleteId;
   const task = pendingEditIdx !== null ? {} : tasks.find(t => t.id === id);
@@ -1405,6 +1509,8 @@ function submitComplete() {
     entry.endTs = customEnd || Date.now();
     if (customStart) entry.startTs = customStart;
     entry.durationSecs = totalSecs;
+    // If custom time was used, deduct that window from break
+    if (customStart && customEnd) deductFromBreak(customStart, customEnd);
     entry.heading = heading;
     entry.project = project; entry.module = module;
     entry.nature = nature; entry.ticket = ticket;
@@ -1853,6 +1959,165 @@ function copyLog() {
     btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
     setTimeout(() => { btn.innerHTML = orig; }, 2000);
   });
+}
+
+
+// ── CSV Export / Import ───────────────────────────────────────────────────────
+function openCSVModal() {
+  const today = todayStr();
+  // Default from: first day of current month
+  const d = new Date(); d.setDate(1);
+  const firstOfMonth = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+  document.getElementById('csv-from').value = firstOfMonth;
+  document.getElementById('csv-to').value = today;
+  document.getElementById('csv-import-from').value = firstOfMonth;
+  document.getElementById('csv-import-to').value = today;
+  document.getElementById('csv-import-preview').textContent = '';
+  document.getElementById('csv-modal').classList.remove('hidden');
+}
+
+const CSV_HEADERS = ['Date','Employee Name','Project','Module / Feature','Nature of Task',
+  'Ticket # if support ticket','Task progress / Effort description','Effort (Minutes)','Status'];
+
+function csvEscape(val) {
+  const s = String(val == null ? '' : val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n'))
+    return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function entryInDateRange(entry, from, to) {
+  const d = new Date(entry.startTs);
+  const ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  if (from && ds < from) return false;
+  if (to   && ds > to)   return false;
+  return true;
+}
+
+function exportCSV() {
+  const from = document.getElementById('csv-from').value;
+  const to   = document.getElementById('csv-to').value;
+  const rows = logEntries.filter(e => entryInDateRange(e, from, to));
+  if (rows.length === 0) { alert('No entries found for the selected date range.'); return; }
+
+  const lines = [CSV_HEADERS.join(',')];
+  rows.forEach(e => {
+    const task = tasks.find(t => t.id === e.taskId);
+    const secs = e.durationSecs != null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+    const d = new Date(e.startTs);
+    lines.push([
+      fmtDate(d),
+      e.employee || userName,
+      e.project || '',
+      e.module  || '',
+      e.nature  || '',
+      e.ticket  || '',
+      e.description || '',
+      Math.ceil(secs / 60),
+      e.taskStatus || (e.endTs ? 'Completed' : (task ? task.status : ''))
+    ].map(csvEscape).join(','));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'effort-log-' + (from||'all') + '-to-' + (to||'all') + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleCSVDrop(e) {
+  e.preventDefault();
+  document.getElementById('csv-drop-zone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) processCSVFile(file);
+}
+function handleCSVFile(input) {
+  if (input.files[0]) processCSVFile(input.files[0]);
+}
+
+function processCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const from = document.getElementById('csv-import-from').value;
+    const to   = document.getElementById('csv-import-to').value;
+    const prev = document.getElementById('csv-import-preview');
+    try {
+      const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+      const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+      const dataRows = lines.slice(1);
+
+      // Map column indices by header name (flexible)
+      const col = {};
+      CSV_HEADERS.forEach(h => { col[h] = header.indexOf(h); });
+
+      let imported = 0, skipped = 0;
+      dataRows.forEach(line => {
+        const vals = parseCSVLine(line);
+        const dateStr = vals[col['Date']] || '';
+        // Normalize date from DD-MM-YYYY to YYYY-MM-DD for range check
+        let iso = dateStr;
+        const parts = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (parts) iso = parts[3] + '-' + parts[2] + '-' + parts[1];
+
+        if (from && iso < from) { skipped++; return; }
+        if (to   && iso > to)   { skipped++; return; }
+
+        const [dd, mm, yyyy] = (dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/) || [,'01','01','2000']).slice(1);
+        const startTs = new Date(parseInt(yyyy), parseInt(mm)-1, parseInt(dd), 9, 0).getTime();
+
+        const mins = parseInt(vals[col['Effort (Minutes)']] || '0', 10) || 0;
+        const entry = {
+          taskId: --taskIdCounter, // negative IDs for imported
+          heading: vals[col['Task progress / Effort description']] || '',
+          employee: vals[col['Employee Name']] || userName,
+          project: vals[col['Project']] || '',
+          module: vals[col['Module / Feature']] || '',
+          nature: vals[col['Nature of Task']] || '',
+          ticket: vals[col['Ticket # if support ticket']] || '',
+          description: vals[col['Task progress / Effort description']] || '',
+          taskStatus: vals[col['Status']] || 'Completed',
+          startTs, endTs: startTs + mins * 60000,
+          durationSecs: mins * 60,
+        };
+        // Skip duplicates (same date+project+description+duration)
+        const isDupe = logEntries.some(e =>
+          e.project === entry.project &&
+          e.description === entry.description &&
+          e.durationSecs === entry.durationSecs &&
+          entryMatchesDate(e, iso)
+        );
+        if (isDupe) { skipped++; return; }
+        logEntries.push(entry);
+        imported++;
+      });
+
+      saveState(); updateLogPanel();
+      prev.innerHTML = `<span style="color:var(--green-dark)">✓ Imported ${imported} entries</span>` +
+        (skipped ? ` <span style="color:var(--text-tertiary)">(${skipped} skipped — out of range or duplicate)</span>` : '');
+    } catch(err) {
+      prev.innerHTML = `<span style="color:var(--red-mid)">✗ Error parsing CSV: ${err.message}</span>`;
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') inQ = false;
+      else cur += ch;
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { result.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
 }
 
 // ── XLSX export (SheetJS) ─────────────────────────────────────────────────────
