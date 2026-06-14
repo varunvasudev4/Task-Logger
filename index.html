@@ -4,19 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Task Time Logger</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231D9E75'/%3E%3Crect x='8' y='9' width='10' height='2' rx='1' fill='white'/%3E%3Crect x='8' y='15' width='16' height='2' rx='1' fill='white' opacity='.7'/%3E%3Crect x='8' y='21' width='12' height='2' rx='1' fill='white' opacity='.5'/%3E%3Ccircle cx='24' cy='10' r='4' fill='white'/%3E%3Cpath d='M23 10l1 1 2-2' stroke='%231D9E75' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
+<link rel="icon" href="./favicon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="./icon-512.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-<link rel="manifest" href="manifest.json" />
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('SW registered', reg))
-      .catch(err => console.error(err));
-  });
-}
-</script>
-  
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -336,6 +326,18 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
   box-shadow: var(--shadow); z-index: 50;
 }
 .wake-notice.show { display: block; }
+
+.task-card.future-task { opacity: 0.85; border-style: dashed; border-color: var(--purple-mid); }
+.future-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; color: var(--purple-mid);
+  background: var(--purple-bg); padding: 4px 9px; border-radius: 20px;
+  white-space: nowrap;
+}
+.badge-planned { background: var(--purple-bg); color: var(--purple-mid); }
+
+
+
 
 .server-banner {
   position: fixed; top: 0; left: 0; right: 0; z-index: 500;
@@ -760,6 +762,8 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
         <button class="tab-btn" onclick="switchTab('user')"><i class="ti ti-user" style="font-size:13px"></i> User</button>
         <button class="tab-btn active" onclick="switchTab('projects')">Projects</button>
         <button class="tab-btn" onclick="switchTab('natures')">Nature of Task</button>
+        <button class="tab-btn" onclick="switchTab('weekends')">Weekends</button>
+        <button class="tab-btn" onclick="switchTab('workhours')">Work Hours</button>
       </div>
       <div id="masters-content"></div>
       <div id="master-add-section" class="master-add-row">
@@ -811,6 +815,25 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
   </div>
 </div>
 
+
+<!-- Weekend prompt -->
+<div class="modal-overlay hidden" id="weekend-prompt-overlay">
+  <div class="username-prompt-box" style="max-width:400px">
+    <div class="username-prompt-title">🗓️ It's the Weekend!</div>
+    <div class="username-prompt-sub" id="weekend-prompt-day">Today is Saturday. Is this a working day for you?</div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1" onclick="setWeekendWorkday(true)">
+        <i class="ti ti-briefcase"></i> Yes, I'm working
+      </button>
+      <button class="btn" style="flex:1" onclick="setWeekendWorkday(false)">
+        <i class="ti ti-beach"></i> No, day off
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text-tertiary);margin-top:10px;text-align:center">
+      If working: break timer counts normally. If day off: only work hours tick (no break).
+    </div>
+  </div>
+</div>
 <!-- CSV Export/Import modal -->
 <div class="modal-overlay hidden" id="csv-modal">
   <div class="modal" style="max-width:520px">
@@ -902,6 +925,11 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 // ── Defaults ──────────────────────────────────────────────────────────────────
+// Work window — defaults, overridden by masters.workHours
+const DEFAULT_WORK_START_H = 9, DEFAULT_WORK_START_M = 30;
+const DEFAULT_WORK_END_H   = 18, DEFAULT_WORK_END_M  = 0;
+const DEFAULT_WEEKEND_DAYS = [0, 6]; // 0=Sun, 6=Sat
+
 const DEFAULT_PROJECTS = [
   'CARDINAL','CIRTEX','GODDARDS','MALCOLM','NAVBRIDGE','NAVONE CMS',
   'NAVONE TMS','RLB','SEALINK','SMART EXPRESS','SRL','TAA','TITUS',
@@ -918,7 +946,12 @@ let tasks = [];
 let logEntries = [];
 let taskIdCounter = 0;
 let intervals = {};
-let masters = { projects: [...DEFAULT_PROJECTS], natures: [...DEFAULT_NATURES] };
+let masters = {
+  projects: [...DEFAULT_PROJECTS], natures: [...DEFAULT_NATURES],
+  weekendDays: [...DEFAULT_WEEKEND_DAYS],
+  workHours: { startH: DEFAULT_WORK_START_H, startM: DEFAULT_WORK_START_M, endH: DEFAULT_WORK_END_H, endM: DEFAULT_WORK_END_M },
+  flags: { sleepAutoPause: true } // future flags can be added here
+};
 let activeMastersTab = 'projects';
 let confirmCallback = null;
 let pendingCompleteId = null;
@@ -944,9 +977,21 @@ function loadState() {
     const m = localStorage.getItem('ttl_masters');
     const u = localStorage.getItem('ttl_username');
     if (t) tasks = JSON.parse(t);
-    if (l) logEntries = JSON.parse(l);
+    if (l) {
+      const allEntries = JSON.parse(l);
+      // Keep only last 3 months
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+      logEntries = allEntries.filter(e => e.startTs >= cutoff);
+    }
     if (counter) taskIdCounter = parseInt(counter) || 0;
-    if (m) masters = JSON.parse(m);
+    if (m) {
+      const parsed = JSON.parse(m);
+      masters = { ...masters, ...parsed };
+      if (!masters.weekendDays) masters.weekendDays = [...DEFAULT_WEEKEND_DAYS];
+      if (!masters.workHours) masters.workHours = { startH: DEFAULT_WORK_START_H, startM: DEFAULT_WORK_START_M, endH: DEFAULT_WORK_END_H, endM: DEFAULT_WORK_END_M };
+      if (!masters.flags) masters.flags = { sleepAutoPause: true };
+      if (masters.flags.sleepAutoPause === undefined) masters.flags.sleepAutoPause = true;
+    }
     if (u) userName = u;
   } catch(e) {}
 }
@@ -1003,29 +1048,41 @@ document.addEventListener('visibilitychange', () => {
     const hiddenDuration = hiddenAt ? now - hiddenAt : 0;
     hiddenAt = null;
 
-    if (hiddenDuration >= SLEEP_AUTO_PAUSE_MS) {
-      // Auto-pause all running tasks
+    const sleepAutoPauseEnabled = (masters.flags && masters.flags.sleepAutoPause !== false);
+    if (sleepAutoPauseEnabled && hiddenDuration >= SLEEP_AUTO_PAUSE_MS) {
+      // Auto-pause all running tasks; deduct 15 min (the threshold) from their time
+      const DEDUCT_MS = SLEEP_AUTO_PAUSE_MS; // deduct the full threshold
       let hadRunning = false;
       tasks.forEach(task => {
         if (task.status === 'running') {
           hadRunning = true;
           if (task.segmentStart !== null) {
-            task.accumulatedMs += now - task.segmentStart;
+            // Bank elapsed up to when hidden, then deduct the 15 min threshold
+            const earned = (hiddenAt || now) - task.segmentStart;
+            task.accumulatedMs += Math.max(0, earned - DEDUCT_MS);
             task.segmentStart = null;
           }
           task.status = 'paused';
           clearInterval(intervals[task.id]); delete intervals[task.id];
+          // Sync any open log entry
+          const openEntry = logEntries.find(e => e.taskId === task.id && e.endTs === null);
+          if (openEntry) { /* will be finalized on completion */ }
         }
       });
       if (hadRunning) {
         saveState();
         renderList();
-        // Start break from when system was hidden (up to work-hours boundary)
+        // Add sleep time as break (from when hidden)
         const dateStr = todayStr();
         const data = getBreakData();
         const day = data[dateStr] || { segments: [], currentStart: null };
+        const sleepStart = now - hiddenDuration;
+        // Push completed sleep segment as break
+        if (isWithinWorkHours() || isWorkingDay()) {
+          day.segments.push({ start: sleepStart, end: now });
+        }
         if (day.currentStart === null && isWithinWorkHours()) {
-          day.currentStart = now - hiddenDuration; // break started when hidden
+          day.currentStart = now; // continue break after wake
         }
         data[dateStr] = day;
         saveBreakData(data);
@@ -1099,12 +1156,24 @@ function esc(str) {
 
 // ── Task CRUD ─────────────────────────────────────────────────────────────────
 function addTask() {
+  const selDate = getSelectedDate(); // YYYY-MM-DD
+  if (selDate < todayStr()) return; // can't add tasks to past dates
   const id = ++taskIdCounter;
+  let createdAt;
+  if (selDate === todayStr()) {
+    createdAt = Date.now();
+  } else {
+    const [y, m, d] = selDate.split('-').map(Number);
+    const now = new Date();
+    // Use current time-of-day on the selected date so ordering stays sensible
+    createdAt = new Date(y, m-1, d, now.getHours(), now.getMinutes(), now.getSeconds()).getTime();
+  }
   tasks.unshift({ id, heading:'', project:'', nature:'', module:'', ticket:'',
-    status:'idle', accumulatedMs:0, segmentStart:null, startedAt:null, createdAt: Date.now() });
+    status:'idle', accumulatedMs:0, segmentStart:null, startedAt:null, createdAt });
   saveState(); renderList();
   setTimeout(() => { const i = document.getElementById('inp-'+id); if(i) i.focus(); }, 40);
 }
+
 
 
 // ── Pause all running tasks except one ───────────────────────────────────────
@@ -1126,6 +1195,7 @@ function pauseOthersExcept(exceptId) {
 function startTask(id) {
   const task = tasks.find(t => t.id === id);
   if (!task) return;
+  if (isFutureTask(task)) return; // future-dated tasks have no actions until their date
 
   // Validate heading
   if (!task.heading.trim()) {
@@ -1595,6 +1665,17 @@ function confirmDeleteTask(id) {
 
 function deleteTask(id) {
   clearInterval(intervals[id]); delete intervals[id];
+  const task = tasks.find(t => t.id === id);
+  // Add consumed task time to break
+  if (task && task.accumulatedMs > 0 && isWithinWorkHours()) {
+    const dateStr = todayStr();
+    const data = getBreakData();
+    const day = data[dateStr] || { segments: [], currentStart: null };
+    const now = Date.now();
+    day.segments.push({ start: now - task.accumulatedMs, end: now });
+    data[dateStr] = day;
+    saveBreakData(data);
+  }
   tasks = tasks.filter(t => t.id !== id);
   logEntries = logEntries.filter(e => e.taskId !== id);
   const row = document.getElementById('row-'+id);
@@ -1622,6 +1703,16 @@ function buildSelectOptions(list, selected) {
     list.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
 }
 
+
+function taskDateStr(task) {
+  if (!task.createdAt) return todayStr();
+  const d = new Date(task.createdAt);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function isFutureTask(task) {
+  return taskDateStr(task) > todayStr();
+}
+
 function renderRow(id) {
   const task = tasks.find(t => t.id === id);
   let container = document.getElementById('row-'+id);
@@ -1634,19 +1725,25 @@ function renderRow(id) {
 
   const {status} = task;
   const isDone=status==='done', isRunning=status==='running', isPaused=status==='paused';
-  container.className = 'task-card'+(isRunning?' running':isPaused?' paused':isDone?' done':'');
+  const isFuture = isFutureTask(task);
+  container.className = 'task-card'+(isRunning?' running':isPaused?' paused':isDone?' done':'')+(isFuture?' future-task':'');
 
   let actionBtns = '';
-  if (status==='idle')
-    actionBtns = `<button class="btn-icon btn-start" onclick="startTask(${id})" title="Start timer"><i class="ti ti-player-play"></i></button>`;
-  if (isRunning)
-    actionBtns = `<button class="btn-icon btn-pause" onclick="pauseTask(${id})" title="Pause"><i class="ti ti-player-pause"></i></button>`;
-  if (isPaused)
-    actionBtns = `<button class="btn-icon btn-start" onclick="resumeTask(${id})" title="Resume"><i class="ti ti-player-play"></i></button>`;
-  if (isRunning || isPaused)
-    actionBtns += `<button class="btn-icon btn-done" onclick="openCompleteModal(${id})" title="Mark done"><i class="ti ti-check"></i></button>`;
-  if (isDone)
-    actionBtns = `<button class="btn-icon" disabled style="border-color:var(--blue-mid);color:var(--blue-dark)"><i class="ti ti-circle-check"></i></button>`;
+  if (isFuture) {
+    // No timer actions for future-dated tasks — just a planned indicator
+    actionBtns = `<span class="future-badge" title="Available on ${taskDateStr(task)}"><i class="ti ti-calendar-time"></i> Planned</span>`;
+  } else {
+    if (status==='idle')
+      actionBtns = `<button class="btn-icon btn-start" onclick="startTask(${id})" title="Start timer"><i class="ti ti-player-play"></i></button>`;
+    if (isRunning)
+      actionBtns = `<button class="btn-icon btn-pause" onclick="pauseTask(${id})" title="Pause"><i class="ti ti-player-pause"></i></button>`;
+    if (isPaused)
+      actionBtns = `<button class="btn-icon btn-start" onclick="resumeTask(${id})" title="Resume"><i class="ti ti-player-play"></i></button>`;
+    if (isRunning || isPaused)
+      actionBtns += `<button class="btn-icon btn-done" onclick="openCompleteModal(${id})" title="Mark done"><i class="ti ti-check"></i></button>`;
+    if (isDone)
+      actionBtns = `<button class="btn-icon" disabled style="border-color:var(--blue-mid);color:var(--blue-dark)"><i class="ti ti-circle-check"></i></button>`;
+  }
 
   const dis = isDone ? 'disabled' : '';
   // Show module/ticket on card only (project & nature shown, no description on card)
@@ -1655,9 +1752,9 @@ function renderRow(id) {
       <input id="inp-${id}" class="task-input" type="text" placeholder="Task / feature name…"
         value="${esc(task.heading)}" ${dis}
         oninput="updateTaskField(${id},'heading',this.value)"
-        onkeydown="if(event.key==='Enter') startTask(${id})" />
-      <span id="timer-${id}" class="timer-display${isRunning?' running':isPaused?' paused':''}">${fmt(liveElapsedSecs(task))}</span>
-      <span class="status-badge badge-${status}">${status}</span>
+        onkeydown="if(event.key==='Enter' && !${isFuture}) startTask(${id})" />
+      ${isFuture ? '' : `<span id="timer-${id}" class="timer-display${isRunning?' running':isPaused?' paused':''}">${fmt(liveElapsedSecs(task))}</span>`}
+      <span class="status-badge badge-${isFuture?'planned':status}">${isFuture?'planned':status}</span>
       <div class="actions">
         ${actionBtns}
         <button class="btn-icon btn-delete" onclick="confirmDeleteTask(${id})" title="Remove"><i class="ti ti-trash"></i></button>
@@ -1697,15 +1794,17 @@ function renderRow(id) {
 
 function renderList() {
   const list = document.getElementById('task-list');
+  const selDate = getSelectedDate();
   const today = todayStr();
-  // Only show tasks created today (or running/paused tasks regardless of date so they're never lost)
+  // Show tasks created on the SELECTED date. Running/paused tasks always show
+  // (so an in-progress timer is never hidden by navigating dates).
   const todayTasks = tasks.filter(t => {
     if (t.status === 'done') return false; // completed tasks never show in card list
     if (t.status === 'running' || t.status === 'paused') return true;
-    if (!t.createdAt) return true; // legacy tasks without date
+    if (!t.createdAt) return selDate === today; // legacy tasks without date — treat as today's
     const d = new Date(t.createdAt);
     const ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-    return ds === today;
+    return ds === selDate;
   });
 
   if (todayTasks.length === 0) {
@@ -1713,7 +1812,7 @@ function renderList() {
       list.innerHTML = '';
       const d = document.createElement('div');
       d.className='empty-state'; d.id='empty-state';
-      d.innerHTML='<i class="ti ti-clipboard-list"></i>No tasks for today — hit "Add task" to begin.';
+      d.innerHTML='<i class="ti ti-clipboard-list"></i>No tasks for this date — hit "Add task" to begin.';
       list.appendChild(d);
     }
     return;
@@ -1850,15 +1949,70 @@ function closeMasters() {
 function switchTab(tab) {
   activeMastersTab = tab;
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
-    b.classList.toggle('active',(i===0&&tab==='user')||(i===1&&tab==='projects')||(i===2&&tab==='natures'));
+    b.classList.toggle('active',(i===0&&tab==='user')||(i===1&&tab==='projects')||(i===2&&tab==='natures')||(i===3&&tab==='weekends')||(i===4&&tab==='workhours'));
   });
   document.getElementById('master-add-input').value='';
   const addSec = document.getElementById('master-add-section');
-  if (addSec) addSec.style.display = tab === 'user' ? 'none' : '';
+  if (addSec) addSec.style.display = (tab === 'user' || tab === 'weekends' || tab === 'workhours') ? 'none' : '';
   renderMastersContent();
 }
 function renderMastersContent() {
   const content = document.getElementById('masters-content');
+  if (activeMastersTab === 'workhours') {
+    const w = getWorkHours();
+    const pad2 = n => String(n).padStart(2,'0');
+    const startVal = pad2(w.startH) + ':' + pad2(w.startM);
+    const endVal   = pad2(w.endH)   + ':' + pad2(w.endM);
+    const sleepFlag = masters.flags && masters.flags.sleepAutoPause !== false;
+    content.innerHTML = `
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+          Set your daily working hours. This controls break tracking, work-hours calculation,
+          and weekend/sleep behavior across the app.
+        </div>
+        <div class="complete-row">
+          <div class="complete-field">
+            <label class="complete-label">Start time</label>
+            <input class="complete-input" id="wh-start" type="time" value="${startVal}" style="width:100%" />
+          </div>
+          <div class="complete-field">
+            <label class="complete-label">End time</label>
+            <input class="complete-input" id="wh-end" type="time" value="${endVal}" style="width:100%" />
+          </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="saveWorkHours()">
+          <i class="ti ti-check"></i> Save Work Hours
+        </button>
+        <div id="wh-saved-msg" style="font-size:11px;color:var(--green-dark);margin-top:6px;display:none">✓ Saved</div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-secondary);user-select:none">
+          <input type="checkbox" id="flag-sleep-pause" ${sleepFlag?'checked':''} onchange="toggleSleepFlag()" style="width:14px;height:14px;cursor:pointer" />
+          Auto-pause tasks after 15 min of sleep / inactivity
+        </label>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px;margin-left:22px">
+          When enabled, tasks running for 15+ minutes while the system is asleep are
+          automatically paused, with that time added to your break. Disable if you
+          want timers to keep running through sleep with no auto-pause.
+        </div>
+      </div>`;
+    return;
+  }
+  if (activeMastersTab === 'weekends') {
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const wd = masters.weekendDays || DEFAULT_WEEKEND_DAYS;
+    content.innerHTML = `
+      <div style="margin-bottom:6px">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Select which days are weekends. On weekend days the app will ask if you're working.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${DAYS.map((d,i)=>`<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:6px 10px;border:1px solid var(--border-md);border-radius:var(--radius-md);background:${wd.includes(i)?'var(--amber-bg)':'var(--bg-secondary)'}">
+            <input type="checkbox" ${wd.includes(i)?'checked':''} onchange="toggleWeekendDay(${i})" style="cursor:pointer" />
+            ${d}
+          </label>`).join('')}
+        </div>
+      </div>`;
+    return;
+  }
   if (activeMastersTab === 'user') {
     content.innerHTML = `
       <div style="margin-bottom:6px">
@@ -1883,6 +2037,41 @@ function renderMastersContent() {
       <button class="btn-icon btn-delete" onclick="deleteMasterItem(${idx})" title="Delete"><i class="ti ti-x"></i></button></div>`).join('')+
     '</div>';
 }
+
+
+function saveWorkHours() {
+  const startVal = document.getElementById('wh-start').value;
+  const endVal   = document.getElementById('wh-end').value;
+  if (!startVal || !endVal) return;
+  const [sh, sm] = startVal.split(':').map(Number);
+  const [eh, em] = endVal.split(':').map(Number);
+  if (!masters.workHours) masters.workHours = {};
+  masters.workHours.startH = sh; masters.workHours.startM = sm;
+  masters.workHours.endH   = eh; masters.workHours.endM   = em;
+  saveState();
+  const msg = document.getElementById('wh-saved-msg');
+  if (msg) { msg.style.display = ''; setTimeout(() => { msg.style.display = 'none'; }, 2000); }
+  // Refresh anything depending on work hours
+  checkBreakState();
+  renderBreakWidget();
+  renderWorkWidget();
+}
+
+function toggleSleepFlag() {
+  if (!masters.flags) masters.flags = {};
+  masters.flags.sleepAutoPause = document.getElementById('flag-sleep-pause').checked;
+  saveState();
+}
+
+function toggleWeekendDay(dayIndex) {
+  if (!masters.weekendDays) masters.weekendDays = [...DEFAULT_WEEKEND_DAYS];
+  const idx = masters.weekendDays.indexOf(dayIndex);
+  if (idx >= 0) masters.weekendDays.splice(idx, 1);
+  else masters.weekendDays.push(dayIndex);
+  saveState();
+  renderMastersContent();
+}
+
 function saveUserName() {
   const inp = document.getElementById('user-name-input');
   const val = inp ? inp.value.trim() : '';
@@ -2047,9 +2236,27 @@ function processCSVFile(file) {
       const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
       const dataRows = lines.slice(1);
 
-      // Map column indices by header name (flexible)
+      // Map column indices by header name (flexible + alias matching)
+      const HEADER_ALIASES = {
+        'Date': ['Date'],
+        'Employee Name': ['Employee Name','Employee','Name'],
+        'Project': ['Project'],
+        'Module / Feature': ['Module / Feature','Module','Feature'],
+        'Nature of Task': ['Nature of Task','Nature'],
+        'Ticket # if support ticket': ['Ticket # if support ticket','Ticket #','Ticket'],
+        'Task progress / Effort description': ['Task progress / Effort description','Task progress / Effrot description','Description','Effort Description','Task Description'],
+        'Effort (Minutes)': ['Effort (Minutes)','Effort','Minutes','Effort (Min)'],
+        'Status': ['Status'],
+        'Remarks': ['Remarks','Remark','Notes','Note']
+      };
       const col = {};
-      CSV_HEADERS.forEach(h => { col[h] = header.indexOf(h); });
+      Object.entries(HEADER_ALIASES).forEach(([key, aliases]) => {
+        col[key] = -1;
+        for (const a of aliases) {
+          const idx = header.findIndex(h => h.toLowerCase() === a.toLowerCase());
+          if (idx >= 0) { col[key] = idx; break; }
+        }
+      });
 
       let imported = 0, skipped = 0;
       dataRows.forEach(line => {
@@ -2063,8 +2270,23 @@ function processCSVFile(file) {
         if (from && iso < from) { skipped++; return; }
         if (to   && iso > to)   { skipped++; return; }
 
-        const [dd, mm, yyyy] = (dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/) || [,'01','01','2000']).slice(1);
-        const startTs = new Date(parseInt(yyyy), parseInt(mm)-1, parseInt(dd), 9, 0).getTime();
+        // Parse date: supports DD-MM-YYYY and DD-Mon-YY / DD-Mon-YYYY
+        let startTs;
+        const numMatch = dateStr.match(/^(\d{1,2})-(\d{2})-(\d{4})$/);
+        const monMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+        if (numMatch) {
+          startTs = new Date(parseInt(numMatch[3]), parseInt(numMatch[2])-1, parseInt(numMatch[1]), 9, 0).getTime();
+          iso = numMatch[3] + '-' + numMatch[2].padStart(2,'0') + '-' + numMatch[1].padStart(2,'0');
+        } else if (monMatch) {
+          const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+          const mo = MONTHS[monMatch[2].toLowerCase()] ?? 0;
+          let yr = parseInt(monMatch[3]); if (yr < 100) yr += 2000;
+          const dy = parseInt(monMatch[1]);
+          startTs = new Date(yr, mo, dy, 9, 0).getTime();
+          iso = yr + '-' + String(mo+1).padStart(2,'0') + '-' + String(dy).padStart(2,'0');
+        } else {
+          startTs = Date.now();
+        }
 
         const mins = parseInt(vals[col['Effort (Minutes)']] || '0', 10) || 0;
         const entry = {
@@ -2075,7 +2297,10 @@ function processCSVFile(file) {
           module: vals[col['Module / Feature']] || '',
           nature: vals[col['Nature of Task']] || '',
           ticket: vals[col['Ticket # if support ticket']] || '',
-          description: vals[col['Task progress / Effort description']] || '',
+          description: [
+            vals[col['Task progress / Effort description']],
+            col['Remarks'] >= 0 ? vals[col['Remarks']] : ''
+          ].filter(Boolean).join(' | ') || '',
           taskStatus: vals[col['Status']] || 'Completed',
           startTs, endTs: startTs + mins * 60000,
           durationSecs: mins * 60,
@@ -2160,6 +2385,35 @@ function exportXLSX() {
 }
 
 
+
+// ── Weekend handling ──────────────────────────────────────────────────────────
+let weekendWorkday = null; // null=not asked, true=working, false=day off
+
+function checkWeekendPrompt() {
+  if (!isTodayWeekend()) return;
+  const stored = localStorage.getItem('ttl_weekend_' + todayStr());
+  if (stored !== null) { weekendWorkday = stored === 'true'; return; }
+  const day = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+  document.getElementById('weekend-prompt-day').textContent =
+    'Today is ' + day + '. Is this a working day for you?';
+  document.getElementById('weekend-prompt-overlay').classList.remove('hidden');
+}
+
+function setWeekendWorkday(isWorking) {
+  weekendWorkday = isWorking;
+  localStorage.setItem('ttl_weekend_' + todayStr(), String(isWorking));
+  document.getElementById('weekend-prompt-overlay').classList.add('hidden');
+  // Re-init break timer logic now that we know the mode
+  checkBreakState();
+  renderBreakWidget();
+  renderWorkWidget();
+}
+
+function isWorkingDay() {
+  if (!isTodayWeekend()) return true;
+  return weekendWorkday === true;
+}
+
 // ── Username prompt on first run ──────────────────────────────────────────────
 function checkUserNamePrompt() {
   const stored = localStorage.getItem('ttl_username');
@@ -2169,6 +2423,9 @@ function checkUserNamePrompt() {
       const inp = document.getElementById('username-prompt-input');
       if (inp) inp.focus();
     }, 100);
+  } else {
+    // Only check weekend after username is confirmed
+    setTimeout(checkWeekendPrompt, 300);
   }
 }
 
@@ -2180,7 +2437,16 @@ function confirmUserName() {
   logEntries.forEach(e => { if (!e.employee) e.employee = val; });
   saveState();
   document.getElementById('username-prompt-overlay').classList.add('hidden');
+  setTimeout(checkWeekendPrompt, 300);
 }
+
+
+// ── Weekend detection ─────────────────────────────────────────────────────────
+function isWeekend(date) {
+  const d = date || new Date();
+  return (masters.weekendDays || DEFAULT_WEEKEND_DAYS).includes(d.getDay());
+}
+function isTodayWeekend() { return isWeekend(new Date()); }
 
 // ── Date filter ───────────────────────────────────────────────────────────────
 function todayStr() {
@@ -2197,6 +2463,7 @@ function initDatePicker() {
 function onDateChange() {
   updateTodayBadge();
   updateTaskVisibility();
+  renderList(); // refresh task cards for the newly selected date
   // Reset collapse state: today collapses by default, past dates show
   logTableExpanded = false;
   updateLogPanel();
@@ -2228,11 +2495,11 @@ function entryMatchesDate(entry, dateStr) {
 }
 
 function updateTaskVisibility() {
-  const sel = getSelectedDate();
-  const isToday = sel === todayStr();
-  document.getElementById('task-list').style.display = isToday ? '' : 'none';
+  // Task list is always visible. "Add task" only makes sense for today
+  // or future dates — disabled on past dates (read-only history).
+  document.getElementById('task-list').style.display = '';
   const addBtn = document.querySelector('.btn-primary[onclick="addTask()"]');
-  if (addBtn) addBtn.style.display = isToday ? '' : 'none';
+  if (addBtn) addBtn.style.display = (getSelectedDate() >= todayStr()) ? '' : 'none';
 }
 
 
@@ -2281,18 +2548,37 @@ function renderWorkWidget() {
 }
 
 // ── Break timer ───────────────────────────────────────────────────────────────
-// Work window: 09:30 – 18:00
-const WORK_START_H = 9, WORK_START_M = 30;
-const WORK_END_H   = 18, WORK_END_M  = 0;
+
 
 let breakInterval = null;
 
+function getWorkHours() {
+  const wh = masters.workHours || {};
+  return {
+    startH: wh.startH ?? DEFAULT_WORK_START_H,
+    startM: wh.startM ?? DEFAULT_WORK_START_M,
+    endH:   wh.endH   ?? DEFAULT_WORK_END_H,
+    endM:   wh.endM   ?? DEFAULT_WORK_END_M,
+  };
+}
+function workHoursLabel() {
+  const w = getWorkHours();
+  const fmt12 = (h,m) => {
+    const period = h >= 12 ? 'PM' : 'AM';
+    let hh = h % 12; if (hh === 0) hh = 12;
+    return hh + (m ? ':' + String(m).padStart(2,'0') : '') + ' ' + period;
+  };
+  return fmt12(w.startH, w.startM) + ' – ' + fmt12(w.endH, w.endM);
+}
+
 function isWithinWorkHours() {
+  if (isTodayWeekend() && !isWorkingDay()) return false; // day off — no work window
   const now = new Date();
   const h = now.getHours(), m = now.getMinutes();
   const mins = h * 60 + m;
-  const start = WORK_START_H * 60 + WORK_START_M;
-  const end   = WORK_END_H   * 60 + WORK_END_M;
+  const w = getWorkHours();
+  const start = w.startH * 60 + w.startM;
+  const end   = w.endH   * 60 + w.endM;
   return mins >= start && mins < end;
 }
 
@@ -2391,9 +2677,16 @@ function renderBreakWidget() {
   display.className = 'break-time' + (onBreakNow ? ' on-break' : '');
   widget.className = 'break-widget' + (onBreakNow ? ' on-break' : (!isWithinWorkHours() && isToday ? ' off-hours' : ''));
 
+  if (isTodayWeekend() && !isWorkingDay() && isToday) {
+    widget.className = 'break-widget off-hours';
+    label.textContent = 'Break';
+    sub.textContent = 'Day off — break not tracked';
+    display.textContent = '—';
+    return;
+  }
   if (!isWithinWorkHours() && isToday) {
     label.textContent = 'Break';
-    sub.textContent = 'Outside work hours (9:30–18:00)';
+    sub.textContent = 'Outside work hours (' + workHoursLabel() + ')';
   } else if (onBreakNow) {
     label.textContent = 'On Break';
     sub.textContent = 'All tasks paused';
@@ -2424,8 +2717,9 @@ function initBreakTimer() {
   if (!hasExistingData && isWithinWorkHours() && !hasRunningTask()) {
     // Work-start timestamp for today
     const now = new Date();
+    const w = getWorkHours();
     const workStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
-      WORK_START_H, WORK_START_M, 0, 0);
+      w.startH, w.startM, 0, 0);
     // Break started at workStart (09:30) — open segment, will close when task starts
     day.currentStart = workStart.getTime();
     data[dateStr] = day;
