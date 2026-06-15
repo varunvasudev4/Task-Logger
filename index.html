@@ -1737,6 +1737,10 @@ function renderRow(id) {
   let container = document.getElementById('row-'+id);
   if (!task) return;
   if (!container) {
+    // Don't create a card for tasks that don't belong to the currently
+    // selected date — avoids tasks from other dates leaking into view
+    // (e.g. when pauseOthersExcept pauses a running task on another date).
+    if (taskDateStr(task) !== getSelectedDate()) return;
     container = document.createElement('div');
     container.id = 'row-'+id;
     document.getElementById('task-list').appendChild(container);
@@ -1815,11 +1819,11 @@ function renderList() {
   const list = document.getElementById('task-list');
   const selDate = getSelectedDate();
   const today = todayStr();
-  // Show tasks created on the SELECTED date. Running/paused tasks always show
-  // (so an in-progress timer is never hidden by navigating dates).
+  // Show only tasks created on the SELECTED date — a task belongs to the date
+  // it was created on, regardless of its current status (running/paused/idle).
+  // This keeps tasks from one day bleeding into another day's view.
   const todayTasks = tasks.filter(t => {
     if (t.status === 'done') return false; // completed tasks never show in card list
-    if (t.status === 'running' || t.status === 'paused') return true;
     if (!t.createdAt) return selDate === today; // legacy tasks without date — treat as today's
     const d = new Date(t.createdAt);
     const ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -1827,7 +1831,14 @@ function renderList() {
   });
 
   if (todayTasks.length === 0) {
-    if (!document.getElementById('empty-state')) {
+    const existingEmpty = document.getElementById('empty-state');
+    if (selDate < today) {
+      // Past dates: just show an empty list, no "no tasks" message
+      if (existingEmpty) existingEmpty.remove();
+      list.innerHTML = '';
+      return;
+    }
+    if (!existingEmpty) {
       list.innerHTML = '';
       const d = document.createElement('div');
       d.className='empty-state'; d.id='empty-state';
