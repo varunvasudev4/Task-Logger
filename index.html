@@ -4,18 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Task Time Logger</title>
-<link rel="icon" href="./favicon.ico" type="image/x-icon">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-<link rel="manifest" href="manifest.json" />
 <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('SW registered', reg))
-      .catch(err => console.error(err));
-  });
-}
+  // Apply saved theme before first paint to avoid a flash of the wrong theme.
+  (function() {
+    try {
+      var saved = localStorage.getItem('ttl_theme'); // 'light' | 'dark' | 'system' | null
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+      // 'system' or unset: leave data-theme unset so the prefers-color-scheme media query applies.
+    } catch (e) {}
+  })();
 </script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231D9E75'/%3E%3Crect x='8' y='9' width='10' height='2' rx='1' fill='white'/%3E%3Crect x='8' y='15' width='16' height='2' rx='1' fill='white' opacity='.7'/%3E%3Crect x='8' y='21' width='12' height='2' rx='1' fill='white' opacity='.5'/%3E%3Ccircle cx='24' cy='10' r='4' fill='white'/%3E%3Cpath d='M23 10l1 1 2-2' stroke='%231D9E75' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -43,8 +45,9 @@ if ('serviceWorker' in navigator) {
   --red-mid: #A32D2D;
   --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
 }
+/* System preference fallback — only applies when no explicit theme is set */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --bg: #1c1c1a; --bg-secondary: #262624; --bg-tertiary: #2e2e2c;
     --text-primary: #f0efe8; --text-secondary: #a0a09a; --text-tertiary: #6b6b66;
     --border: rgba(255,255,255,0.10); --border-md: rgba(255,255,255,0.20);
@@ -54,6 +57,28 @@ if ('serviceWorker' in navigator) {
     --red-bg: #501313; --red-mid: #F09595;
     --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
   }
+}
+/* Explicit dark theme — set via the theme toggle, overrides system preference */
+:root[data-theme="dark"] {
+  --bg: #1c1c1a; --bg-secondary: #262624; --bg-tertiary: #2e2e2c;
+  --text-primary: #f0efe8; --text-secondary: #a0a09a; --text-tertiary: #6b6b66;
+  --border: rgba(255,255,255,0.10); --border-md: rgba(255,255,255,0.20);
+  --green-bg: #04342C; --green-mid: #5DCAA5; --green-dark: #9FE1CB;
+  --amber-bg: #412402; --amber-mid: #EF9F27; --amber-dark: #FAC775;
+  --blue-bg: #042C53; --blue-mid: #378ADD; --blue-dark: #85B7EB;
+  --red-bg: #501313; --red-mid: #F09595;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+}
+/* Explicit light theme — set via the theme toggle, overrides system preference */
+:root[data-theme="light"] {
+  --bg: #ffffff; --bg-secondary: #f5f5f3; --bg-tertiary: #efefec;
+  --text-primary: #1a1a18; --text-secondary: #6b6b66; --text-tertiary: #9e9e99;
+  --border: rgba(0,0,0,0.10); --border-md: rgba(0,0,0,0.20);
+  --green-bg: #E1F5EE; --green-mid: #1D9E75; --green-dark: #0F6E56;
+  --amber-bg: #FAEEDA; --amber-mid: #BA7517; --amber-dark: #854F0B;
+  --blue-bg: #E6F1FB; --blue-mid: #185FA5; --blue-dark: #0C447C;
+  --red-bg: #FCEBEB; --red-mid: #A32D2D;
+  --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
 }
 
 body {
@@ -610,6 +635,8 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
         <input type="date" id="log-date-input" class="date-picker-input" onchange="onDateChange()" />
         <span id="today-badge" class="date-today-badge">Today</span>
       </div>
+      <button class="btn" onclick="cycleTheme()" id="theme-toggle-btn" title="Switch theme"><i class="ti ti-sun" id="theme-toggle-icon"></i> <span id="theme-toggle-label">Light</span></button>
+      <button class="btn" onclick="openDashboard()"><i class="ti ti-chart-bar"></i> Dashboard</button>
       <button class="btn" onclick="openMasters()"><i class="ti ti-list-details"></i> Masters</button>
       <button class="btn btn-primary" onclick="addTask()"><i class="ti ti-plus"></i> Add task</button>
     </div>
@@ -643,17 +670,7 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     <div class="log-wrap">
       <table>
         <thead>
-          <tr>
-            <th>Date</th>
-            <th>Employee Name</th>
-            <th>Project</th>
-            <th>Module / Feature</th>
-            <th>Nature of Task</th>
-            <th>Ticket # if support ticket</th>
-            <th>Task progress / Effort description</th>
-            <th>Effort (Minutes)</th>
-            <th>Status</th>
-            <th style="width:36px"></th>
+          <tr id="log-thead-row">
           </tr>
         </thead>
         <tbody id="log-tbody"></tbody>
@@ -718,38 +735,34 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
       </div>
 
       <div class="complete-row">
-        <div class="complete-field">
-          <label class="complete-label">Project <span class="req">*</span></label>
+        <div class="complete-field" id="cm-project-field">
+          <label class="complete-label" id="cm-project-label">Project <span class="req">*</span></label>
           <select class="complete-select" id="cm-project">
             <option value="">— select —</option>
           </select>
         </div>
-        <div class="complete-field">
-          <label class="complete-label">Nature of Task <span class="req">*</span></label>
+        <div class="complete-field" id="cm-nature-field">
+          <label class="complete-label" id="cm-nature-label">Nature of Task <span class="req">*</span></label>
           <select class="complete-select" id="cm-nature">
             <option value="">— select —</option>
           </select>
         </div>
       </div>
       <div class="complete-row">
-        <div class="complete-field">
-          <label class="complete-label">Module / Feature <span class="req">*</span></label>
+        <div class="complete-field" id="cm-module-field">
+          <label class="complete-label" id="cm-module-label">Module / Feature <span class="req">*</span></label>
           <input class="complete-input" id="cm-module" type="text" placeholder="e.g. Scanner Integration" />
         </div>
-        <div class="complete-field">
-          <label class="complete-label">Ticket #</label>
+        <div class="complete-field" id="cm-ticket-field">
+          <label class="complete-label" id="cm-ticket-label">Ticket #</label>
           <input class="complete-input" id="cm-ticket" type="text" placeholder="e.g. NAV-1234" />
         </div>
       </div>
       <div class="complete-row">
-        <div class="complete-field">
-          <label class="complete-label">Status <span class="req">*</span></label>
+        <div class="complete-field" id="cm-status-field">
+          <label class="complete-label" id="cm-status-label">Status <span class="req">*</span></label>
           <select class="complete-select" id="cm-status">
             <option value="">— select —</option>
-            <option value="Completed">Completed</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Pending">Pending</option>
-            <option value="Blocked">Blocked</option>
           </select>
         </div>
         <div class="complete-field">
@@ -757,10 +770,15 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
           <div style="font-size:11px;color:var(--text-tertiary);padding-top:8px">Choose the final status for this task</div>
         </div>
       </div>
-      <div class="complete-field">
-        <label class="complete-label">Task progress / Effort description <span class="req">*</span></label>
+      <div class="complete-field" id="cm-description-field">
+        <label class="complete-label" id="cm-description-label">Task progress / Effort description <span class="req">*</span></label>
         <textarea class="complete-textarea" id="cm-description" placeholder="Describe what was done…"></textarea>
       </div>
+      <div class="complete-field" id="cm-remark-field">
+        <label class="complete-label" id="cm-remark-label">Remark</label>
+        <textarea class="complete-textarea" id="cm-remark" placeholder="Optional remark or note…" style="min-height:52px"></textarea>
+      </div>
+      <div id="cm-custom-fields"></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeCompleteModal()">Cancel</button>
@@ -769,9 +787,31 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
   </div>
 </div>
 
+<!-- Carry Forward date-picker modal -->
+<div class="modal-overlay hidden" id="carry-forward-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-calendar-plus" style="vertical-align:-2px;margin-right:6px;color:var(--blue-mid)"></i>Carry Forward Task</div>
+      <button class="btn-icon" onclick="closeCarryForwardModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="cf-task-name" style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-primary)"></div>
+      <div class="complete-field">
+        <label class="complete-label">Add task to date</label>
+        <input class="complete-input" id="cf-date" type="date" style="width:100%" />
+      </div>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">The task will be created with status Not Started and 00:00 duration on the chosen date.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCarryForwardModal()">Cancel</button>
+      <button class="btn btn-primary" id="cf-confirm-btn" onclick="confirmCarryForward()"><i class="ti ti-check"></i> Add Task</button>
+    </div>
+  </div>
+</div>
+
 <!-- Masters modal -->
 <div class="modal-overlay hidden" id="masters-modal">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" id="masters-modal-box" style="max-width:480px">
     <div class="modal-header">
       <div class="modal-title"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:6px"></i>Edit Masters</div>
       <button class="btn-icon" onclick="closeMasters()"><i class="ti ti-x"></i></button>
@@ -779,8 +819,8 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     <div class="modal-body">
       <div class="masters-tabs">
         <button class="tab-btn" onclick="switchTab('user')"><i class="ti ti-user" style="font-size:13px"></i> User</button>
-        <button class="tab-btn active" onclick="switchTab('projects')">Projects</button>
-        <button class="tab-btn" onclick="switchTab('natures')">Nature of Task</button>
+        <button class="tab-btn active" onclick="switchTab('lists')"><i class="ti ti-list" style="font-size:13px"></i> Lists</button>
+        <button class="tab-btn" onclick="switchTab('columns')"><i class="ti ti-table" style="font-size:13px"></i> Columns</button>
         <button class="tab-btn" onclick="switchTab('weekends')">Weekends</button>
         <button class="tab-btn" onclick="switchTab('workhours')">Work Hours</button>
       </div>
@@ -792,6 +832,41 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeMasters()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard modal -->
+<div class="modal-overlay hidden" id="dashboard-modal">
+  <div class="modal" id="dashboard-modal-box" style="max-width:760px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-chart-bar" style="vertical-align:-2px;margin-right:6px"></i>Effort Dashboard</div>
+      <button class="btn-icon" onclick="closeDashboard()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div class="complete-field" style="flex:0 0 auto">
+          <label class="complete-label">From</label>
+          <input class="complete-input" id="dash-from" type="date" onchange="renderDashboard()" />
+        </div>
+        <div class="complete-field" style="flex:0 0 auto">
+          <label class="complete-label">To</label>
+          <input class="complete-input" id="dash-to" type="date" onchange="renderDashboard()" />
+        </div>
+        <div class="complete-field" style="flex:0 0 auto">
+          <label class="complete-label">Group by</label>
+          <select class="complete-select" id="dash-groupby" onchange="renderDashboard()"></select>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="setDashRange('week')">This week</button>
+          <button class="btn" onclick="setDashRange('month')">This month</button>
+          <button class="btn" onclick="setDashRange('all')">All time</button>
+        </div>
+      </div>
+      <div id="dashboard-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeDashboard()">Close</button>
     </div>
   </div>
 </div>
@@ -958,20 +1033,53 @@ const DEFAULT_NATURES = [
   'Development','Bug Fix','Testing','Code Review','Deployment',
   'Support','Meeting','R&D','Documentation','Customer Support','Configuration'
 ];
+const DEFAULT_STATUSES = ['Completed','In Progress','Pending','Blocked'];
+
+// Log table columns. ALL columns are fully configurable: rename, reorder, show/hide,
+// and change input type (text / list / date with format). Date, Employee Name, Effort,
+// and Status ship as defaults but behave like any other column once added — the app
+// just keeps a special meaning attached to whichever column key drives date/duration/
+// status logic internally (see isDateColumn / isEffortColumn / isStatusColumn / isEmployeeColumn).
+// CUSTOM columns the user adds work exactly the same way and store their values in
+// each task/entry's `customFields` map.
+// Visibility is split into three independent flags so a column can, for example, be
+// edited on the task card but hidden from the log table, or shown in the log table
+// but excluded from the Complete/Edit popup:
+//   showInTaskCard      — rendered as an input on the running task card
+//   showInLogTable       — rendered as a column in the log table (and exports/CSV)
+//   showInCompletePopup  — rendered as an input in the Complete Task / Edit Log Entry popup
+const DEFAULT_LOG_COLUMNS = [
+  { key: 'date',        label: 'Date',                                  showInTaskCard: false, showInLogTable: true, showInCompletePopup: false, type: 'date', dateFormat: 'DD-MM-YYYY', isDateColumn: true, essential: true },
+  { key: 'employee',    label: 'Employee Name',                         showInTaskCard: false, showInLogTable: true, showInCompletePopup: false, type: 'text', isEmployeeColumn: true },
+  { key: 'project',     label: 'Project',                               showInTaskCard: true,  showInLogTable: true, showInCompletePopup: true,  type: 'list', listSource: 'projects', builtIn: true },
+  { key: 'module',      label: 'Module / Feature',                      showInTaskCard: true,  showInLogTable: true, showInCompletePopup: true,  type: 'text', builtIn: true },
+  { key: 'nature',      label: 'Nature of Task',                        showInTaskCard: true,  showInLogTable: true, showInCompletePopup: true,  type: 'list', listSource: 'natures', builtIn: true },
+  { key: 'ticket',      label: 'Ticket # if support ticket',            showInTaskCard: true,  showInLogTable: true, showInCompletePopup: true,  type: 'text', builtIn: true },
+  { key: 'description', label: 'Task progress / Effort description',   showInTaskCard: false, showInLogTable: true, showInCompletePopup: true,  type: 'text', builtIn: true, isTaskName: true },
+  { key: 'effort',      label: 'Effort (Minutes)',                      showInTaskCard: false, showInLogTable: true, showInCompletePopup: false, type: 'text', isEffortColumn: true, essential: true },
+  { key: 'status',      label: 'Status',                                showInTaskCard: false, showInLogTable: true, showInCompletePopup: true,  type: 'list', listSource: 'statuses', isStatusColumn: true },
+  { key: 'remark',      label: 'Remark',                                showInTaskCard: false, showInLogTable: true, showInCompletePopup: true,  type: 'text', builtIn: true }
+];
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let userName = '';
 let tasks = [];
 let logEntries = [];
 let taskIdCounter = 0;
+let importIdCounter = 0; // separate negative-only namespace for CSV-imported entries, never overlaps real task IDs
 let intervals = {};
 let masters = {
-  projects: [...DEFAULT_PROJECTS], natures: [...DEFAULT_NATURES],
   weekendDays: [...DEFAULT_WEEKEND_DAYS],
   workHours: { startH: DEFAULT_WORK_START_H, startM: DEFAULT_WORK_START_M, endH: DEFAULT_WORK_END_H, endM: DEFAULT_WORK_END_M },
-  flags: { sleepAutoPause: true } // future flags can be added here
+  flags: { sleepAutoPause: true }, // future flags can be added here
+  logColumns: DEFAULT_LOG_COLUMNS.map(c => ({ ...c })),
+  // Single consolidated store for every list-type column's options — Projects, Nature of
+  // Task, Status, and any custom list the user creates all live here side by side and are
+  // all managed from the one "Lists" tab in Masters.
+  customLists: { projects: [...DEFAULT_PROJECTS], natures: [...DEFAULT_NATURES], statuses: [...DEFAULT_STATUSES] }
 };
-let activeMastersTab = 'projects';
+let activeMastersTab = 'lists';
+let activeListKey = 'projects'; // which list is selected inside the consolidated Lists tab
 let confirmCallback = null;
 let pendingCompleteId = null;
 let pendingEditIdx = null;
@@ -983,6 +1091,7 @@ function saveState() {
     localStorage.setItem('ttl_tasks',    JSON.stringify(tasks));
     localStorage.setItem('ttl_log',      JSON.stringify(logEntries));
     localStorage.setItem('ttl_counter',  String(taskIdCounter));
+    localStorage.setItem('ttl_import_counter', String(importIdCounter));
     localStorage.setItem('ttl_masters',  JSON.stringify(masters));
     localStorage.setItem('ttl_username', userName);
   } catch(e) {}
@@ -993,6 +1102,7 @@ function loadState() {
     const t = localStorage.getItem('ttl_tasks');
     const l = localStorage.getItem('ttl_log');
     const counter = localStorage.getItem('ttl_counter');
+    const importCounter = localStorage.getItem('ttl_import_counter');
     const m = localStorage.getItem('ttl_masters');
     const u = localStorage.getItem('ttl_username');
     if (t) tasks = JSON.parse(t);
@@ -1003,6 +1113,7 @@ function loadState() {
       logEntries = allEntries.filter(e => e.startTs >= cutoff);
     }
     if (counter) taskIdCounter = parseInt(counter) || 0;
+    if (importCounter) importIdCounter = parseInt(importCounter) || 0;
     if (m) {
       const parsed = JSON.parse(m);
       masters = { ...masters, ...parsed };
@@ -1010,8 +1121,79 @@ function loadState() {
       if (!masters.workHours) masters.workHours = { startH: DEFAULT_WORK_START_H, startM: DEFAULT_WORK_START_M, endH: DEFAULT_WORK_END_H, endM: DEFAULT_WORK_END_M };
       if (!masters.flags) masters.flags = { sleepAutoPause: true };
       if (masters.flags.sleepAutoPause === undefined) masters.flags.sleepAutoPause = true;
+      if (!masters.logColumns || !Array.isArray(masters.logColumns) || masters.logColumns.length === 0) {
+        masters.logColumns = DEFAULT_LOG_COLUMNS.map(c => ({ ...c }));
+      } else {
+        // Merge in any default columns missing from a saved config (e.g. after an app update)
+        const haveKeys = masters.logColumns.map(c => c.key);
+        DEFAULT_LOG_COLUMNS.forEach(dc => {
+          if (!haveKeys.includes(dc.key)) masters.logColumns.push({ ...dc });
+        });
+        // Backfill fields for columns saved under an older schema (pre-this-update), and
+        // drop the old `locked` flag — every column is fully configurable now.
+        masters.logColumns.forEach(c => {
+          if (!c.type) c.type = 'text';
+          delete c.locked;
+          if (c.key === 'date' && c.type === 'text') { c.type = 'date'; c.dateFormat = c.dateFormat || 'DD-MM-YYYY'; c.isDateColumn = true; }
+          if (c.key === 'status' && c.type === 'text') { c.type = 'list'; c.listSource = 'statuses'; c.isStatusColumn = true; }
+          if (c.key === 'employee') c.isEmployeeColumn = true;
+          if (c.key === 'effort') c.isEffortColumn = true;
+          // Migrate the old single `visible` flag into the three independent per-context
+          // flags, if this column was saved under the pre-split schema.
+          if (c.showInTaskCard === undefined || c.showInLogTable === undefined || c.showInCompletePopup === undefined) {
+            const wasVisible = c.visible !== false;
+            const def = DEFAULT_LOG_COLUMNS.find(dc => dc.key === c.key);
+            c.showInLogTable = wasVisible;
+            // Date/Employee/Effort never had card/popup inputs — keep them out of those
+            // contexts even if migrating from the old flag, matching their defaults.
+            c.showInTaskCard = (def ? def.showInTaskCard : true) && wasVisible;
+            c.showInCompletePopup = (def ? def.showInCompletePopup : true) && wasVisible;
+            delete c.visible;
+          }
+        });
+      }
+      if (!masters.customLists || typeof masters.customLists !== 'object') masters.customLists = {};
+      // Migrate legacy separate masters.projects / masters.natures arrays (from older saved
+      // data) into the unified customLists store, then drop the old separate keys.
+      if (Array.isArray(masters.projects)) {
+        if (!masters.customLists.projects) masters.customLists.projects = masters.projects;
+        delete masters.projects;
+      }
+      if (Array.isArray(masters.natures)) {
+        if (!masters.customLists.natures) masters.customLists.natures = masters.natures;
+        delete masters.natures;
+      }
+      if (!masters.customLists.projects) masters.customLists.projects = [...DEFAULT_PROJECTS];
+      if (!masters.customLists.natures) masters.customLists.natures = [...DEFAULT_NATURES];
+      if (!masters.customLists.statuses) masters.customLists.statuses = [...DEFAULT_STATUSES];
+
+      // One-time sweep: remove any custom list with no column pointing to it. This cleans
+      // up lists left behind by earlier app versions (before column deletion correctly
+      // cleaned up its dedicated list) or by any interrupted/partial edit.
+      const PROTECTED_LIST_KEYS = ['projects', 'natures', 'statuses'];
+      const colsForSweep = masters.logColumns || [];
+      Object.keys(masters.customLists).forEach(lk => {
+        if (PROTECTED_LIST_KEYS.includes(lk)) return;
+        const stillOwned = colsForSweep.some(c => c.listSource === lk);
+        if (!stillOwned) delete masters.customLists[lk];
+      });
     }
     if (u) userName = u;
+
+    // ── One-time migration: repair counter/ID collisions from the old scheme where
+    // CSV imports decremented the same counter used for real tasks. If taskIdCounter
+    // was dragged to 0 or below by old imports, or any real task ID collides with an
+    // existing log entry's taskId from a different task, bump taskIdCounter clear of
+    // every ID currently in use so future tasks (including carry-forward) never reuse
+    // an ID that belongs to an old imported/unrelated log entry.
+    let maxKnownId = 0;
+    tasks.forEach(t => { if (typeof t.id === 'number' && t.id > maxKnownId) maxKnownId = t.id; });
+    logEntries.forEach(e => { if (typeof e.taskId === 'number' && e.taskId > maxKnownId) maxKnownId = e.taskId; });
+    if (taskIdCounter <= maxKnownId) taskIdCounter = maxKnownId;
+
+    let minKnownId = 0;
+    logEntries.forEach(e => { if (typeof e.taskId === 'number' && e.taskId < minKnownId) minKnownId = e.taskId; });
+    if (importIdCounter >= minKnownId) importIdCounter = minKnownId;
   } catch(e) {}
 }
 
@@ -1173,6 +1355,95 @@ function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Log table column configuration helpers ─────────────────────────────────
+function getLogColumns() {
+  if (!masters.logColumns || !Array.isArray(masters.logColumns) || masters.logColumns.length === 0) {
+    return DEFAULT_LOG_COLUMNS.map(c => ({ ...c }));
+  }
+  return masters.logColumns;
+}
+function getVisibleLogColumns() {
+  return getLogColumns().filter(c => c.showInLogTable !== false);
+}
+// Columns to render as inputs on the running task card, in configured order.
+function getTaskCardColumns() {
+  return getLogColumns().filter(c => c.showInTaskCard !== false);
+}
+// Columns to render as inputs in the Complete Task / Edit Log Entry popup, in configured order.
+function getCompletePopupColumns() {
+  return getLogColumns().filter(c => c.showInCompletePopup !== false);
+}
+// Columns that already have their own dedicated, hand-built input in the Complete/Edit
+// popup (heading, project, nature, module, ticket, status, description, remark) — these
+// must be excluded from the generic dynamic custom-fields renderer to avoid duplicating
+// the same field twice (e.g. a second Status dropdown).
+function isDynamicPopupColumn(c) {
+  return !c.builtIn && !c.essential && !c.isStatusColumn && !c.isDateColumn
+    && !c.isEffortColumn && !c.isEmployeeColumn;
+}
+// All configurable (non-locked) columns, built-in or custom — used to render dynamic
+// inputs on the task card and Complete popup, in their configured order.
+function getConfigurableColumns() {
+  return getLogColumns(); // every column is configurable now; kept for call-site clarity
+}
+function getColumnByKey(key) {
+  return getLogColumns().find(c => c.key === key);
+}
+// Format a date value (ISO YYYY-MM-DD string) according to a column's chosen dateFormat.
+function formatCustomDate(isoStr, dateFormat) {
+  if (!isoStr) return '';
+  const [y, m, d] = isoStr.split('-');
+  if (!y || !m || !d) return isoStr;
+  switch (dateFormat) {
+    case 'DD-MM-YYYY': return `${d}-${m}-${y}`;
+    case 'MM-DD-YYYY': return `${m}-${d}-${y}`;
+    case 'DD/MM/YYYY': return `${d}/${m}/${y}`;
+    case 'MM/DD/YYYY': return `${m}/${d}/${y}`;
+    case 'YYYY-MM-DD': return `${y}-${m}-${d}`;
+    default:
+      // Arbitrary custom format string, e.g. "DD.MM.YYYY" — replace tokens generically.
+      if (dateFormat && /YYYY|MM|DD/.test(dateFormat)) {
+        return dateFormat.replace(/YYYY/g, y).replace(/MM/g, m).replace(/DD/g, d);
+      }
+      return `${y}-${m}-${d}`;
+  }
+}
+// Raw value for a given column key from a log entry (used by table render, copy, export)
+function getEntryValueForColumn(e, task, key) {
+  switch (key) {
+    case 'date': {
+      const d = new Date(e.startTs);
+      const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      const colDef = getColumnByKey('date');
+      return formatCustomDate(iso, (colDef && colDef.dateFormat) || 'DD-MM-YYYY');
+    }
+    case 'employee':    return e.employee || userName;
+    case 'project':     return e.project || '';
+    case 'module':      return e.module || '';
+    case 'nature':      return e.nature || '';
+    case 'ticket':      return e.ticket || '';
+    case 'description': return e.heading || ''; // on-screen table shows task/feature name here
+    case 'effort': {
+      const secs = e.durationSecs != null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+      return Math.ceil(secs / 60);
+    }
+    case 'status':       return e.taskStatus || (e.endTs ? 'Completed' : (task ? task.status : ''));
+    case 'remark':       return e.remark || '';
+    default: {
+      // Custom column: stored under e.customFields[key]
+      const raw = (e.customFields && e.customFields[key]) || '';
+      const colDef = getColumnByKey(key);
+      if (colDef && colDef.type === 'date' && raw) return formatCustomDate(raw, colDef.dateFormat);
+      return raw;
+    }
+  }
+}
+// Export/copy value differs only for 'description': uses the actual typed description, not the task name
+function getExportValueForColumn(e, task, key) {
+  if (key === 'description') return e.description || '';
+  return getEntryValueForColumn(e, task, key);
+}
+
 // ── Task CRUD ─────────────────────────────────────────────────────────────────
 function addTask() {
   const selDate = getSelectedDate(); // YYYY-MM-DD
@@ -1188,7 +1459,7 @@ function addTask() {
     createdAt = new Date(y, m-1, d, now.getHours(), now.getMinutes(), now.getSeconds()).getTime();
   }
   tasks.unshift({ id, heading:'', project:'', nature:'', module:'', ticket:'',
-    status:'idle', accumulatedMs:0, segmentStart:null, startedAt:null, createdAt });
+    status:'idle', accumulatedMs:0, segmentStart:null, startedAt:null, createdAt, customFields:{} });
   saveState(); renderList();
   setTimeout(() => { const i = document.getElementById('inp-'+id); if(i) i.focus(); }, 40);
 }
@@ -1234,7 +1505,8 @@ function startTask(id) {
     nature: task.nature, ticket: task.ticket || '',
     description: '', // filled at completion
     employee: userName,
-    startTs: Date.now(), endTs: null, durationSecs: null
+    startTs: Date.now(), endTs: null, durationSecs: null,
+    customFields: { ...(task.customFields || {}) }
   });
 
   intervals[id] = setInterval(() => {
@@ -1277,37 +1549,86 @@ function openCompleteModal(id) {
 
   document.getElementById('cm-timer').textContent = fmt(liveElapsedSecs(task));
 
+  // Pull the most recent log entry for this task (completed or reopened) so that
+  // reopening a completed task and marking it complete again re-populates every
+  // field exactly as it was last saved, not just description/remark.
+  const lastEntry =
+    [...logEntries].reverse().find(e => e.taskId === id && e.endTs !== null) ||
+    [...logEntries].reverse().find(e => e.taskId === id);
+
+  const heading = (lastEntry && lastEntry.heading) || task.heading || '';
+  const project = (lastEntry && lastEntry.project) || task.project || '';
+  const nature  = (lastEntry && lastEntry.nature)  || task.nature  || '';
+  const module_ = (lastEntry && lastEntry.module)  || task.module  || '';
+  const ticket  = (lastEntry && lastEntry.ticket)  || task.ticket  || '';
+
   // Task name
   const headEl = document.getElementById('cm-heading');
-  headEl.value = task.heading || '';
+  headEl.value = heading;
   headEl.classList.remove('invalid');
 
   // Project
   const pSel = document.getElementById('cm-project');
   pSel.innerHTML = '<option value="">— select —</option>' +
-    masters.projects.map(v => `<option value="${esc(v)}" ${v===task.project?'selected':''}>${esc(v)}</option>`).join('');
+    masters.customLists.projects.map(v => `<option value="${esc(v)}" ${v===project?'selected':''}>${esc(v)}</option>`).join('');
   pSel.classList.remove('invalid');
 
   // Nature
   const nSel = document.getElementById('cm-nature');
   nSel.innerHTML = '<option value="">— select —</option>' +
-    masters.natures.map(v => `<option value="${esc(v)}" ${v===task.nature?'selected':''}>${esc(v)}</option>`).join('');
+    masters.customLists.natures.map(v => `<option value="${esc(v)}" ${v===nature?'selected':''}>${esc(v)}</option>`).join('');
   nSel.classList.remove('invalid');
 
   const modEl = document.getElementById('cm-module');
-  modEl.value = task.module || '';
+  modEl.value = module_;
   modEl.classList.remove('invalid');
 
-  document.getElementById('cm-ticket').value = task.ticket || '';
+  document.getElementById('cm-ticket').value = ticket;
 
-  // Status — default to Completed
+  // Status — populate options from the configured status list, always default to
+  // Completed when (re-)opening this popup, regardless of what was saved last time
   const stSel = document.getElementById('cm-status');
-  stSel.value = 'Completed';
+  populateStatusSelect(stSel, 'Completed');
   stSel.classList.remove('invalid');
 
   const descEl = document.getElementById('cm-description');
-  descEl.value = '';
+  descEl.value = (lastEntry && lastEntry.description) || '';
   descEl.classList.remove('invalid');
+
+  const remarkEl = document.getElementById('cm-remark');
+  if (remarkEl) { remarkEl.value = (lastEntry && lastEntry.remark) || ''; }
+
+  // Apply dynamic labels + show/hide for configurable built-in columns
+  const projCol = getColumnByKey('project'), natCol = getColumnByKey('nature'),
+        modCol = getColumnByKey('module'), tickCol = getColumnByKey('ticket'),
+        descCol = getColumnByKey('description'), remCol = getColumnByKey('remark');
+  const setFieldVisibility = (fieldId, labelId, col, requiredSuffix) => {
+    const fieldEl = document.getElementById(fieldId);
+    const labelEl = document.getElementById(labelId);
+    if (fieldEl) fieldEl.style.display = (col && col.visible === false) ? 'none' : '';
+    if (labelEl && col) labelEl.innerHTML = esc(col.label) + (requiredSuffix ? ' <span class="req">*</span>' : '');
+  };
+  setFieldVisibility('cm-project-field', 'cm-project-label', projCol, true);
+  setFieldVisibility('cm-nature-field', 'cm-nature-label', natCol, true);
+  setFieldVisibility('cm-module-field', 'cm-module-label', modCol, true);
+  setFieldVisibility('cm-ticket-field', 'cm-ticket-label', tickCol, false);
+  setFieldVisibility('cm-description-field', 'cm-description-label', descCol, true);
+  setFieldVisibility('cm-remark-field', 'cm-remark-label', remCol, false);
+  setFieldVisibility('cm-status-field', 'cm-status-label', getColumnByKey('status'), true);
+
+  // Render custom (user-added) column inputs, pre-filled from lastEntry's customFields
+  const customContainer = document.getElementById('cm-custom-fields');
+  if (customContainer) {
+    const customCols = getCompletePopupColumns().filter(isDynamicPopupColumn);
+    customContainer.innerHTML = customCols.map(c => {
+      const val = (lastEntry && lastEntry.customFields && lastEntry.customFields[c.key])
+        || (task.customFields && task.customFields[c.key]) || '';
+      return `<div class="complete-field">
+        <label class="complete-label">${esc(c.label)}</label>
+        ${buildDynamicFieldInput(c, 'cm-custom-' + c.key, val, '', '')}
+      </div>`;
+    }).join('');
+  }
 
   // Clear duration adjustment and custom time for fresh completion
   const adjInp = document.getElementById('cm-duration-adj');
@@ -1359,12 +1680,12 @@ function editLogEntry(globalIdx) {
 
   const pSel = document.getElementById('cm-project');
   pSel.innerHTML = '<option value="">— select —</option>' +
-    masters.projects.map(v => `<option value="${esc(v)}" ${v===entry.project?'selected':''}>${esc(v)}</option>`).join('');
+    masters.customLists.projects.map(v => `<option value="${esc(v)}" ${v===entry.project?'selected':''}>${esc(v)}</option>`).join('');
   pSel.classList.remove('invalid');
 
   const nSel = document.getElementById('cm-nature');
   nSel.innerHTML = '<option value="">— select —</option>' +
-    masters.natures.map(v => `<option value="${esc(v)}" ${v===entry.nature?'selected':''}>${esc(v)}</option>`).join('');
+    masters.customLists.natures.map(v => `<option value="${esc(v)}" ${v===entry.nature?'selected':''}>${esc(v)}</option>`).join('');
   nSel.classList.remove('invalid');
 
   const modEl = document.getElementById('cm-module');
@@ -1373,10 +1694,44 @@ function editLogEntry(globalIdx) {
   document.getElementById('cm-ticket').value = entry.ticket || '';
 
   const stSel = document.getElementById('cm-status');
-  stSel.value = entry.taskStatus || 'Completed'; stSel.classList.remove('invalid');
+  populateStatusSelect(stSel, entry.taskStatus || 'Completed'); stSel.classList.remove('invalid');
 
   const descEl = document.getElementById('cm-description');
   descEl.value = entry.description || ''; descEl.classList.remove('invalid');
+
+  const remarkEl = document.getElementById('cm-remark');
+  if (remarkEl) remarkEl.value = entry.remark || '';
+
+  // Apply dynamic labels + show/hide for configurable built-in columns
+  const projCol = getColumnByKey('project'), natCol = getColumnByKey('nature'),
+        modCol = getColumnByKey('module'), tickCol = getColumnByKey('ticket'),
+        descCol = getColumnByKey('description'), remCol = getColumnByKey('remark');
+  const setFieldVisibility = (fieldId, labelId, col, requiredSuffix) => {
+    const fieldEl = document.getElementById(fieldId);
+    const labelEl = document.getElementById(labelId);
+    if (fieldEl) fieldEl.style.display = (col && col.visible === false) ? 'none' : '';
+    if (labelEl && col) labelEl.innerHTML = esc(col.label) + (requiredSuffix ? ' <span class="req">*</span>' : '');
+  };
+  setFieldVisibility('cm-project-field', 'cm-project-label', projCol, true);
+  setFieldVisibility('cm-nature-field', 'cm-nature-label', natCol, true);
+  setFieldVisibility('cm-module-field', 'cm-module-label', modCol, true);
+  setFieldVisibility('cm-ticket-field', 'cm-ticket-label', tickCol, false);
+  setFieldVisibility('cm-description-field', 'cm-description-label', descCol, true);
+  setFieldVisibility('cm-remark-field', 'cm-remark-label', remCol, false);
+  setFieldVisibility('cm-status-field', 'cm-status-label', getColumnByKey('status'), true);
+
+  // Render custom (user-added) column inputs, pre-filled from this entry's customFields
+  const customContainer = document.getElementById('cm-custom-fields');
+  if (customContainer) {
+    const customCols = getCompletePopupColumns().filter(isDynamicPopupColumn);
+    customContainer.innerHTML = customCols.map(c => {
+      const val = (entry.customFields && entry.customFields[c.key]) || '';
+      return `<div class="complete-field">
+        <label class="complete-label">${esc(c.label)}</label>
+        ${buildDynamicFieldInput(c, 'cm-custom-' + c.key, val, '', '')}
+      </div>`;
+    }).join('');
+  }
 
   // Update modal chrome for edit mode
   document.querySelector('#complete-modal .modal-title').innerHTML =
@@ -1530,19 +1885,30 @@ function submitComplete() {
   const ticket   = document.getElementById('cm-ticket').value.trim();
   const status   = document.getElementById('cm-status').value.trim();
   const desc     = document.getElementById('cm-description').value.trim();
+  const remark   = (document.getElementById('cm-remark') || {value:''}).value.trim();
+
+  // Collect custom (user-configured) column values from the popup
+  const customCols = getCompletePopupColumns().filter(isDynamicPopupColumn);
+  const customValues = {};
+  customCols.forEach(c => {
+    const el = document.getElementById('cm-custom-' + c.key);
+    if (el) customValues[c.key] = el.value;
+  });
 
   let invalid = false;
-  const check = (elId, val) => {
+  const check = (elId, val, fieldId) => {
     const el = document.getElementById(elId);
-    if (!val) { el.classList.add('invalid'); invalid=true; }
+    const fieldEl = fieldId ? document.getElementById(fieldId) : null;
+    const isHidden = fieldEl && fieldEl.style.display === 'none';
+    if (!val && !isHidden) { el.classList.add('invalid'); invalid=true; }
     else el.classList.remove('invalid');
   };
   check('cm-heading', heading);
-  check('cm-project', project);
-  check('cm-nature', nature);
-  check('cm-module', module);
-  check('cm-status', status);
-  check('cm-description', desc);
+  check('cm-project', project, 'cm-project-field');
+  check('cm-nature', nature, 'cm-nature-field');
+  check('cm-module', module, 'cm-module-field');
+  check('cm-status', status, 'cm-status-field');
+  check('cm-description', desc, 'cm-description-field');
   if (invalid) return;
 
   // Edit mode — just update entry fields, no task changes
@@ -1552,7 +1918,9 @@ function submitComplete() {
       editEntry.heading = heading; editEntry.project = project;
       editEntry.module = module;   editEntry.nature = nature;
       editEntry.ticket = ticket;   editEntry.taskStatus = status;
-      editEntry.description = desc;
+      editEntry.description = desc; editEntry.remark = remark;
+      if (!editEntry.customFields) editEntry.customFields = {};
+      Object.assign(editEntry.customFields, customValues);
       const adjMinsEdit = parseInt(document.getElementById('cm-duration-adj').value, 10);
       if (!isNaN(adjMinsEdit) && adjMinsEdit > 0) editEntry.durationSecs = adjMinsEdit * 60;
       const csEdit = getCustomStartTimestamp();
@@ -1593,6 +1961,8 @@ function submitComplete() {
   task.heading = heading;
   task.project = project; task.nature = nature;
   task.module = module; task.ticket = ticket;
+  if (!task.customFields) task.customFields = {};
+  Object.assign(task.customFields, customValues);
   const entry = [...logEntries].reverse().find(e => e.taskId===id && e.endTs===null);
   if (entry) {
     entry.endTs = customEnd || Date.now();
@@ -1605,6 +1975,9 @@ function submitComplete() {
     entry.nature = nature; entry.ticket = ticket;
     entry.taskStatus = status;
     entry.description = desc;
+    entry.remark = remark;
+    if (!entry.customFields) entry.customFields = {};
+    Object.assign(entry.customFields, customValues);
   }
   closeCompleteModal();
   saveState();
@@ -1613,6 +1986,106 @@ function submitComplete() {
   if (doneRow) doneRow.remove();
   updateEmptyState();
   updateLogPanel();
+}
+
+// ── Continue an "In Progress" task tomorrow (manual, button-triggered) ───────
+// Creates a fresh idle task for the next calendar day with 00:00 duration,
+// copying name/project/nature/module/ticket from the source task's last log entry.
+// ── Continue an "In Progress" task on a chosen day (manual, button-triggered) ─
+// Opens a small date-picker modal pre-filled with the day after the entry's
+// own date. Confirming creates a fresh idle task on the chosen date with
+// 00:00 duration, copying name/project/nature/module/ticket from the entry.
+let pendingCarryForwardTaskId = null;
+
+function continueTomorrow(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  const entry = [...logEntries].reverse().find(e => e.taskId === taskId);
+  if (!task && !entry) return;
+
+  pendingCarryForwardTaskId = taskId;
+
+  const heading = (entry && entry.heading) || (task && task.heading) || 'Untitled';
+  document.getElementById('cf-task-name').textContent = heading;
+
+  // Default the date field to the day after the entry's own date —
+  // not real-world today — so carrying forward a past day's entry
+  // defaults sensibly to the day right after it.
+  const baseDate = entry ? new Date(entry.startTs) : new Date();
+  const nextDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + 1);
+  const nextDayStr = nextDay.getFullYear() + '-' +
+    String(nextDay.getMonth() + 1).padStart(2, '0') + '-' +
+    String(nextDay.getDate()).padStart(2, '0');
+  document.getElementById('cf-date').value = nextDayStr;
+
+  document.getElementById('carry-forward-modal').classList.remove('hidden');
+}
+
+function closeCarryForwardModal() {
+  document.getElementById('carry-forward-modal').classList.add('hidden');
+  pendingCarryForwardTaskId = null;
+}
+
+function confirmCarryForward() {
+  const taskId = pendingCarryForwardTaskId;
+  if (taskId == null) return;
+
+  const chosenDateStr = document.getElementById('cf-date').value;
+  if (!chosenDateStr) { document.getElementById('cf-date').classList.add('invalid'); return; }
+
+  const task = tasks.find(t => t.id === taskId);
+  const entry = [...logEntries].reverse().find(e => e.taskId === taskId);
+  if (!task && !entry) { closeCarryForwardModal(); return; }
+
+  const heading = (entry && entry.heading) || (task && task.heading) || '';
+  const project = (entry && entry.project) || (task && task.project) || '';
+  const nature  = (entry && entry.nature)  || (task && task.nature)  || '';
+  const module  = (entry && entry.module)  || (task && task.module)  || '';
+  const ticket  = (entry && entry.ticket)  || (task && task.ticket)  || '';
+  const customFields = { ...((entry && entry.customFields) || (task && task.customFields) || {}) };
+
+  const [yy, mm, dd] = chosenDateStr.split('-').map(Number);
+  const w = (typeof getWorkHours === 'function') ? getWorkHours() : { startH: 9, startM: 30 };
+  const carryTs = new Date(yy, mm - 1, dd, w.startH, w.startM, 0, 0).getTime();
+
+  const newId = ++taskIdCounter;
+  tasks.unshift({
+    id: newId,
+    heading, project, nature, module, ticket, customFields,
+    status: 'idle',
+    accumulatedMs: 0,       // starts fresh at 00:00 for daily-basis logging
+    segmentStart: null,
+    startedAt: null,
+    createdAt: carryTs,
+    carriedOver: true       // flag so the card shows a "Carried" badge
+  });
+
+  saveState();
+  updateLogTable();
+  closeCarryForwardModal();
+
+  // Notice
+  const notice = document.getElementById('wake-notice');
+  if (notice) {
+    notice.textContent = '📋 Task added to ' + chosenDateStr + ' at 00:00 — "' + (heading || 'Untitled') + '"';
+    notice.style.background = 'var(--blue-mid)';
+    notice.classList.add('show');
+    setTimeout(() => {
+      notice.classList.remove('show');
+      notice.style.background = '';
+      notice.textContent = '⏱ Timers refreshed after wake';
+    }, 4000);
+  }
+
+  // If the date picker is already showing the chosen date, render the row immediately
+  if (typeof getSelectedDate === 'function' && getSelectedDate() === chosenDateStr) {
+    const list = document.getElementById('task-list');
+    const emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+    const rowEl = document.createElement('div');
+    rowEl.id = 'row-' + newId;
+    list.insertBefore(rowEl, list.firstChild);
+    renderRow(newId);
+  }
 }
 
 
@@ -1716,10 +2189,36 @@ function updateTaskField(id, field, val) {
   updateLogTable();
 }
 
+// Update a custom (user-configured) column's value on a task, keyed by column key.
+function updateTaskCustomField(id, colKey, val) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  if (!task.customFields) task.customFields = {};
+  task.customFields[colKey] = val;
+  const openEntry = [...logEntries].reverse().find(e => e.taskId === id && e.endTs === null);
+  if (openEntry) {
+    if (!openEntry.customFields) openEntry.customFields = {};
+    openEntry.customFields[colKey] = val;
+  }
+  saveState();
+  updateLogTable();
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function buildSelectOptions(list, selected) {
   return '<option value="">— select —</option>' +
     list.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
+}
+
+// Populate the status <select> from the configured status list (masters.customLists.statuses
+// by default, or whatever list the user has set the Status column to use). Falls back to
+// preferredValue if present in the list, else leaves on the placeholder.
+function populateStatusSelect(selectEl, preferredValue) {
+  if (!selectEl) return;
+  const statusCol = getColumnByKey('status');
+  const listKey = (statusCol && statusCol.listSource) || 'statuses';
+  const options = (masters.customLists && masters.customLists[listKey]) || [];
+  selectEl.innerHTML = buildSelectOptions(options, options.includes(preferredValue) ? preferredValue : '');
 }
 
 
@@ -1730,6 +2229,25 @@ function taskDateStr(task) {
 }
 function isFutureTask(task) {
   return taskDateStr(task) > todayStr();
+}
+
+// Build the HTML for a single configurable column's input, for use on the task card
+// or inside the Complete popup. `value` is the current raw value (ISO date string for
+// date columns). `onChangeExpr` is the JS expression string to run on change/input.
+function buildDynamicFieldInput(col, idAttr, value, onChangeExpr, disabledAttr) {
+  const label = esc(col.label);
+  if (col.type === 'list') {
+    const options = (masters.customLists && masters.customLists[col.listSource]) || [];
+    return `<select id="${idAttr}" class="meta-select" ${disabledAttr} onchange="${onChangeExpr}">
+      ${buildSelectOptions(options, value)}
+    </select>`;
+  }
+  if (col.type === 'date') {
+    return `<input id="${idAttr}" class="meta-input" type="date" ${disabledAttr}
+      value="${esc(value || '')}" onchange="${onChangeExpr}" />`;
+  }
+  return `<input id="${idAttr}" class="meta-input" type="text" ${disabledAttr}
+    value="${esc(value || '')}" oninput="${onChangeExpr}" />`;
 }
 
 function renderRow(id) {
@@ -1778,36 +2296,44 @@ function renderRow(id) {
         onkeydown="if(event.key==='Enter' && !${isFuture}) startTask(${id})" />
       ${isFuture ? '' : `<span id="timer-${id}" class="timer-display${isRunning?' running':isPaused?' paused':''}">${fmt(liveElapsedSecs(task))}</span>`}
       <span class="status-badge badge-${isFuture?'planned':status}">${isFuture?'planned':status}</span>
+      ${task.carriedOver ? `<span class="status-badge" style="background:var(--amber-bg);color:var(--amber-dark);font-size:10px" title="Carried over from previous day's In Progress task"><i class="ti ti-arrow-forward-up" style="font-size:11px;vertical-align:-1px"></i> Carried</span>` : ''}
       <div class="actions">
         ${actionBtns}
         <button class="btn-icon btn-delete" onclick="confirmDeleteTask(${id})" title="Remove"><i class="ti ti-trash"></i></button>
       </div>
     </div>
     <div class="task-meta">
-      <div class="meta-field meta-field-project">
-        <span class="meta-label">Project <span class="req">*</span></span>
+      ${getColumnByKey('project').showInTaskCard !== false ? `<div class="meta-field meta-field-project">
+        <span class="meta-label">${esc(getColumnByKey('project').label)} <span class="req">*</span></span>
         <select id="meta-project-${id}" class="meta-select" ${dis}
           onchange="updateTaskField(${id},'project',this.value)">
-          ${buildSelectOptions(masters.projects, task.project)}
+          ${buildSelectOptions(masters.customLists.projects, task.project)}
         </select>
-      </div>
-      <div class="meta-field meta-field-nature">
-        <span class="meta-label">Nature of Task <span class="req">*</span></span>
+      </div>` : ''}
+      ${getColumnByKey('nature').showInTaskCard !== false ? `<div class="meta-field meta-field-nature">
+        <span class="meta-label">${esc(getColumnByKey('nature').label)} <span class="req">*</span></span>
         <select id="meta-nature-${id}" class="meta-select" ${dis}
           onchange="updateTaskField(${id},'nature',this.value)">
-          ${buildSelectOptions(masters.natures, task.nature)}
+          ${buildSelectOptions(masters.customLists.natures, task.nature)}
         </select>
-      </div>
-      <div class="meta-field meta-field-module">
-        <span class="meta-label">Module / Feature <span class="req">*</span></span>
+      </div>` : ''}
+      ${getColumnByKey('module').showInTaskCard !== false ? `<div class="meta-field meta-field-module">
+        <span class="meta-label">${esc(getColumnByKey('module').label)} <span class="req">*</span></span>
         <input id="meta-module-${id}" class="meta-input" type="text" placeholder="e.g. Scanner Integration" ${dis}
           value="${esc(task.module)}" oninput="updateTaskField(${id},'module',this.value)" />
-      </div>
-      <div class="meta-field meta-field-ticket">
-        <span class="meta-label">Ticket #</span>
+      </div>` : ''}
+      ${getColumnByKey('ticket').showInTaskCard !== false ? `<div class="meta-field meta-field-ticket">
+        <span class="meta-label">${esc(getColumnByKey('ticket').label)}</span>
         <input id="meta-ticket-${id}" class="meta-input" type="text" placeholder="e.g. NAV-1234" ${dis}
           value="${esc(task.ticket)}" oninput="updateTaskField(${id},'ticket',this.value)" />
-      </div>
+      </div>` : ''}
+      ${getTaskCardColumns().filter(isDynamicPopupColumn).map(c => {
+        const val = (task.customFields && task.customFields[c.key]) || '';
+        return `<div class="meta-field meta-field-custom">
+          <span class="meta-label">${esc(c.label)}</span>
+          ${buildDynamicFieldInput(c, `meta-${c.key}-${id}`, val, `updateTaskCustomField(${id},'${c.key}',this.value)`, dis)}
+        </div>`;
+      }).join('')}
     </div>
     <div class="validation-msg" id="val-msg-${id}">
       <i class="ti ti-alert-circle"></i> Project, Nature of Task and Module are required before starting.
@@ -1904,35 +2430,53 @@ function applyLogTableState() {
 
 function updateLogTable() {
   const tbody = document.getElementById('log-tbody');
+  const theadRow = document.getElementById('log-thead-row');
   if (!tbody) return;
   const selDate = getSelectedDate ? getSelectedDate() : todayStr();
   const filtered = logEntries.filter(e => entryMatchesDate(e, selDate));
+  const cols = getVisibleLogColumns();
+
+  // Render header row dynamically from configured columns (locked columns keep their
+  // fixed labels; configurable columns use the user's renamed label if set).
+  if (theadRow) {
+    theadRow.innerHTML = cols.map(c => `<th>${esc(c.label)}</th>`).join('') + '<th style="width:36px"></th>';
+  }
+
   tbody.innerHTML = filtered.map(e => {
     const task = tasks.find(t=>t.id===e.taskId);
     const isRunning = task && task.status==='running';
-    const startD = new Date(e.startTs);
-    const endCell = e.endTs
-      ? fmtTime(new Date(e.endTs))
-      : (isRunning ? `<span class="cell-running">in progress…</span>` : '—');
-    const secs = e.durationSecs!==null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
-    const durCell = e.durationSecs!==null
-      ? `<span class="cell-dur">${fmtDuration(e.durationSecs)}</span>`
-      : (task ? `<span class="cell-dur">${fmt(liveElapsedSecs(task))}</span>` : '—');
-    const minsCell = e.durationSecs!==null
-      ? `<span class="cell-dur">${Math.ceil(e.durationSecs/60)}</span>`
-      : (task ? Math.ceil(liveElapsedSecs(task)/60) : '—');
     const statusText = e.taskStatus || (e.endTs ? 'Completed' : (task ? task.status : '—'));
+
+    const cells = cols.map(c => {
+      if (c.key === 'description') {
+        return `<td class="td-desc">${esc(e.heading || (isRunning ? '— pending on completion —' : ''))}</td>`;
+      }
+      if (c.key === 'remark') {
+        return `<td class="td-desc">${esc(e.remark || '')}</td>`;
+      }
+      if (c.key === 'effort') {
+        const minsCell = e.durationSecs!==null
+          ? `<span class="cell-dur">${Math.ceil(e.durationSecs/60)}</span>`
+          : (task ? Math.ceil(liveElapsedSecs(task)/60) : '—');
+        return `<td>${minsCell}</td>`;
+      }
+      if (c.key === 'status') {
+        return `<td>${esc(statusText)}</td>`;
+      }
+      return `<td>${esc(getEntryValueForColumn(e, task, c.key))}</td>`;
+    }).join('');
+
     return `<tr>
-      <td>${fmtDate(startD)}</td>
-      <td>${esc(e.employee || userName)}</td>
-      <td>${esc(e.project)}</td>
-      <td>${esc(e.module)}</td>
-      <td>${esc(e.nature)}</td>
-      <td>${esc(e.ticket)}</td>
-      <td class="td-desc">${esc(e.description || (isRunning ? '— pending on completion —' : ''))}</td>
-      <td>${minsCell}</td>
-      <td>${statusText}</td>
-      <td>${selDate === todayStr() ? '<div style="display:flex;flex-direction:row;align-items:center;gap:4px"><button class="btn-icon btn-edit" onclick="editLogEntry('+logEntries.indexOf(e)+')" title="Edit entry"><i class="ti ti-pencil"></i></button><button class="btn-icon" onclick="reopenTask('+e.taskId+')" title="Reopen task" style="border-color:var(--amber-mid);color:var(--amber-dark)"><i class="ti ti-refresh"></i></button><button class="btn-icon btn-delete" onclick="confirmDeleteLogEntry('+logEntries.indexOf(e)+')" title="Delete entry"><i class="ti ti-trash"></i></button></div>' : ''}</td>
+      ${cells}
+      <td>
+        <div style="display:flex;flex-direction:row;align-items:center;gap:4px">
+        ${selDate === todayStr() ? '<button class="btn-icon btn-edit" onclick="editLogEntry('+logEntries.indexOf(e)+')" title="Edit entry"><i class="ti ti-pencil"></i></button>' : ''}
+        ${statusText==='In Progress'
+            ? '<button class="btn-icon" id="continue-'+e.taskId+'" onclick="continueTomorrow('+e.taskId+')" title="Add this task to another day" style="border-color:var(--blue-mid);color:var(--blue-dark)"><i class="ti ti-calendar-plus"></i></button>'
+            : (selDate === todayStr() ? '<button class="btn-icon" onclick="reopenTask('+e.taskId+')" title="Reopen task" style="border-color:var(--amber-mid);color:var(--amber-dark)"><i class="ti ti-refresh"></i></button>' : '')}
+        ${selDate === todayStr() ? '<button class="btn-icon btn-delete" onclick="confirmDeleteLogEntry('+logEntries.indexOf(e)+')" title="Delete entry"><i class="ti ti-trash"></i></button>' : ''}
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1969,23 +2513,149 @@ function openMasters() {
   document.getElementById('masters-modal').classList.remove('hidden');
   // Default to user tab so name is easy to set; switch to projects tab otherwise
   const addSec = document.getElementById('master-add-section');
-  if (addSec) addSec.style.display = activeMastersTab === 'user' ? 'none' : '';
+  if (addSec) addSec.style.display = (activeMastersTab === 'projects' || activeMastersTab === 'natures') ? '' : 'none';
   renderMastersContent();
 }
 function closeMasters() {
   document.getElementById('masters-modal').classList.add('hidden');
   tasks.forEach(task => { if(task.status!=='done') renderRow(task.id); });
+  // If left inside a custom-list sub-view, return to the Columns tab for next time
+  if (activeMastersTab.startsWith('customlist:')) activeMastersTab = 'columns';
 }
 function switchTab(tab) {
   activeMastersTab = tab;
+  const TAB_ORDER = ['user','lists','columns','weekends','workhours'];
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
-    b.classList.toggle('active',(i===0&&tab==='user')||(i===1&&tab==='projects')||(i===2&&tab==='natures')||(i===3&&tab==='weekends')||(i===4&&tab==='workhours'));
+    b.classList.toggle('active', TAB_ORDER[i] === tab);
   });
   document.getElementById('master-add-input').value='';
   const addSec = document.getElementById('master-add-section');
-  if (addSec) addSec.style.display = (tab === 'user' || tab === 'weekends' || tab === 'workhours') ? 'none' : '';
+  // The Lists tab and Columns tab now have their own dedicated, self-contained controls.
+  if (addSec) addSec.style.display = 'none';
+  const box = document.getElementById('masters-modal-box');
+  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '480px';
   renderMastersContent();
 }
+// ── Columns tab: configure log table / task card columns ───────────────────
+function renderColumnsTabHTML() {
+  const cols = getLogColumns();
+  const TYPE_LABELS = { text: 'Text', list: 'Dropdown list', date: 'Date' };
+  const DATE_FORMAT_PRESETS = ['DD-MM-YYYY','YYYY-MM-DD','MM-DD-YYYY','DD/MM/YYYY','MM/DD/YYYY'];
+  // Date and Effort can't be deleted — the timer/duration math depends on these existing —
+  // but they can still be renamed, reordered, and (for Date) have their format changed.
+  const UNDELETABLE_KEYS = ['date', 'effort'];
+
+  const rows = cols.map((c, idx) => {
+    const listOptions = Object.keys(masters.customLists || {});
+    const isCustomFormat = c.type === 'date' && c.dateFormat && !DATE_FORMAT_PRESETS.includes(c.dateFormat);
+    return `<div class="master-item" draggable="true" data-idx="${idx}"
+        ondragstart="colDragStart(event,${idx})" ondragover="colDragOver(event,${idx})"
+        ondragleave="colDragLeave(event)" ondrop="colDrop(event,${idx})" ondragend="colDragEnd(event)"
+        style="flex-wrap:wrap;align-items:flex-start;gap:8px;padding:10px 8px">
+      <span class="master-drag-handle" title="Drag to reorder" style="margin-top:6px"><i class="ti ti-grip-vertical"></i></span>
+      <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:6px">
+        <input class="master-add-input" style="padding:6px 8px;font-size:13px" value="${esc(c.label)}"
+          onchange="renameColumn('${c.key}', this.value)" placeholder="Column label" />
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select class="meta-select" style="font-size:12px;padding:4px 6px;width:auto" onchange="changeColumnType('${c.key}', this.value)">
+            ${Object.entries(TYPE_LABELS).map(([t,l]) => `<option value="${t}" ${c.type===t?'selected':''}>${l}</option>`).join('')}
+          </select>
+          ${c.type === 'date' ? `<select class="meta-select" style="font-size:12px;padding:4px 6px;width:auto" onchange="changeColumnDateFormat('${c.key}', this.value)">
+            ${DATE_FORMAT_PRESETS.map(f => `<option value="${f}" ${c.dateFormat===f?'selected':''}>${f}</option>`).join('')}
+            <option value="__custom__" ${isCustomFormat?'selected':''}>Custom…</option>
+          </select>
+          ${isCustomFormat ? `<input class="master-add-input" style="padding:4px 8px;font-size:12px;width:120px" value="${esc(c.dateFormat)}"
+            onchange="changeColumnDateFormat('${c.key}', this.value)" placeholder="e.g. DD.MM.YYYY" />` : ''}` : ''}
+          ${c.type === 'list' ? `<select class="meta-select" style="font-size:12px;padding:4px 6px;width:auto" onchange="changeColumnListSource('${c.key}', this.value)">
+            <option value="">— choose list —</option>
+            ${listOptions.map(lk => `<option value="${lk}" ${c.listSource===lk?'selected':''}>${listLabel(lk)}</option>`).join('')}
+            <option value="__new__">+ Create new list…</option>
+          </select>
+          ${c.listSource ? `<button class="btn" style="font-size:11px;padding:4px 8px" onclick="goToListInListsTab('${c.listSource}')"><i class="ti ti-list"></i> Manage list</button>` : ''}` : ''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-secondary);cursor:pointer" title="Show this column as an input on the task card">
+          <input type="checkbox" ${c.showInTaskCard!==false?'checked':''} onchange="toggleColumnContext('${c.key}','showInTaskCard')" />
+          Task card
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-secondary);cursor:pointer" title="Show this column in the log table (and exports/CSV)">
+          <input type="checkbox" ${c.showInLogTable!==false?'checked':''} onchange="toggleColumnContext('${c.key}','showInLogTable')" />
+          Log table
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-secondary);cursor:pointer" title="Show this column as an input in the Complete / Edit Entry popup">
+          <input type="checkbox" ${c.showInCompletePopup!==false?'checked':''} onchange="toggleColumnContext('${c.key}','showInCompletePopup')" />
+          Complete popup
+        </label>
+        ${!UNDELETABLE_KEYS.includes(c.key) ? `<button class="btn-icon btn-delete" onclick="confirmDeleteColumn('${c.key}')" title="Delete column"><i class="ti ti-trash"></i></button>` : `<span style="font-size:10px;color:var(--text-tertiary)" title="Required for timer/duration tracking">required</span>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+      Drag rows to reorder, rename any column's label, choose its input type, and show/hide it in
+      the log table, task card, and Complete popup. Date and Effort can't be deleted since the
+      timer depends on them, but every other column — including Status — can be renamed, retyped,
+      or removed. Changes apply to exports and CSV import mapping too.
+    </div>
+    <div class="master-list" id="columns-list-container">${rows}</div>
+    <div style="display:flex;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+      <input class="master-add-input" id="new-column-label" placeholder="New column name…" style="flex:1" onkeydown="if(event.key==='Enter') addCustomColumn()" />
+      <select class="meta-select" id="new-column-type" style="width:auto">
+        <option value="text">Text</option>
+        <option value="list">Dropdown list</option>
+        <option value="date">Date</option>
+      </select>
+      <button class="btn btn-primary" onclick="addCustomColumn()"><i class="ti ti-plus"></i> Add Column</button>
+    </div>
+  `;
+}
+
+function listLabel(listKey) {
+  const ownerCols = getLogColumns().filter(c => c.listSource === listKey);
+  if (ownerCols.length === 1) return ownerCols[0].label;
+  if (listKey === 'projects') return 'Projects';
+  if (listKey === 'natures') return 'Nature of Task';
+  if (listKey === 'statuses') return 'Status';
+  return listKey;
+}
+
+// ── Lists tab: one consolidated place to manage every dropdown's options ───
+function renderListsTabHTML() {
+  const allListKeys = Object.keys(masters.customLists || {});
+  if (!allListKeys.includes(activeListKey)) activeListKey = allListKeys[0] || '';
+  const items = (masters.customLists && masters.customLists[activeListKey]) || [];
+  const usedByCols = getLogColumns().filter(c => c.listSource === activeListKey).map(c => c.label);
+
+  return `
+    <div style="margin-bottom:12px">
+      <label class="complete-label" style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:block;margin-bottom:5px">Choose a list to manage</label>
+      <select class="meta-select" style="width:100%" onchange="selectActiveList(this.value)">
+        ${allListKeys.map(lk => `<option value="${esc(lk)}" ${lk===activeListKey?'selected':''}>${esc(listLabel(lk))}</option>`).join('')}
+      </select>
+      ${usedByCols.length ? `<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">Used by column: ${esc(usedByCols.join(', '))}</div>` : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input class="master-add-input" id="bulk-list-input" placeholder="Add items, comma-separated — e.g. Low, Medium, High" style="flex:1" onkeydown="if(event.key==='Enter') bulkAddCustomListItems(activeListKey)" />
+      <button class="btn btn-primary" onclick="bulkAddCustomListItems(activeListKey)"><i class="ti ti-plus"></i> Add</button>
+    </div>
+    ${items.length === 0 ? '<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">No items yet.</div>' :
+      '<div class="master-list" id="lists-tab-container">' + items.map((item, idx) => `<div class="master-item" draggable="true" data-idx="${idx}"
+        ondragstart="listItemDragStart(event,${idx})" ondragover="listItemDragOver(event,${idx})"
+        ondragleave="listItemDragLeave(event)" ondrop="listItemDrop(event,${idx})" ondragend="listItemDragEnd(event)">
+        <span class="master-drag-handle" title="Drag to reorder"><i class="ti ti-grip-vertical"></i></span>
+        <span class="master-item-name">${esc(item)}</span>
+        <button class="btn-icon btn-delete" onclick="deleteCustomListItem(activeListKey,${idx})" title="Delete"><i class="ti ti-x"></i></button>
+      </div>`).join('') + '</div>'}
+  `;
+}
+
+function selectActiveList(listKey) {
+  activeListKey = listKey;
+  renderMastersContent();
+}
+
 function renderMastersContent() {
   const content = document.getElementById('masters-content');
   if (activeMastersTab === 'workhours') {
@@ -2057,19 +2727,14 @@ function renderMastersContent() {
       </div>`;
     return;
   }
-  const list = masters[activeMastersTab];
-  if (list.length===0) {
-    content.innerHTML='<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">No items yet.</div>';
+  if (activeMastersTab === 'columns') {
+    content.innerHTML = renderColumnsTabHTML();
     return;
   }
-  const reorderable = (activeMastersTab === 'projects' || activeMastersTab === 'natures');
-  content.innerHTML='<div class="master-list" id="master-list-container">'+
-    list.map((item,idx)=>`<div class="master-item" draggable="${reorderable}" data-idx="${idx}"
-        ${reorderable ? `ondragstart="masterDragStart(event,${idx})" ondragover="masterDragOver(event,${idx})" ondragleave="masterDragLeave(event)" ondrop="masterDrop(event,${idx})" ondragend="masterDragEnd(event)"` : ''}>
-      ${reorderable ? '<span class="master-drag-handle" title="Drag to reorder"><i class="ti ti-grip-vertical"></i></span>' : ''}
-      <span class="master-item-name">${esc(item)}</span>
-      <button class="btn-icon btn-delete" onclick="deleteMasterItem(${idx})" title="Delete"><i class="ti ti-x"></i></button></div>`).join('')+
-    '</div>';
+  if (activeMastersTab === 'lists') {
+    content.innerHTML = renderListsTabHTML();
+    return;
+  }
 }
 
 
@@ -2174,6 +2839,261 @@ function deleteMasterItem(idx) {
   masters[activeMastersTab].splice(idx,1); saveState(); renderMastersContent();
 }
 
+// ── Column configuration handlers ───────────────────────────────────────────
+function renameColumn(key, newLabel) {
+  const col = getColumnByKey(key);
+  if (!col) return;
+  const trimmed = newLabel.trim();
+  if (!trimmed) return; // ignore empty rename, keep previous label
+  col.label = trimmed;
+  saveState();
+  refreshAfterColumnConfigChange();
+}
+
+function changeColumnType(key, newType) {
+  const col = getColumnByKey(key);
+  if (!col) return;
+  const oldListSource = col.listSource;
+  col.type = newType;
+  if (newType === 'date' && !col.dateFormat) col.dateFormat = 'YYYY-MM-DD';
+  if (newType !== 'list') {
+    col.listSource = undefined;
+    cleanupOrphanedList(oldListSource, key);
+  }
+  saveState();
+  renderMastersContent();
+  refreshAfterColumnConfigChange();
+}
+
+// Delete a custom list from masters.customLists if it's not one of the shared built-in
+// lists (projects/natures/statuses) and no column other than `excludeKey` still uses it.
+function cleanupOrphanedList(listKey, excludeKey) {
+  if (!listKey || listKey === 'projects' || listKey === 'natures' || listKey === 'statuses') return;
+  const stillUsed = getLogColumns().some(c => c.key !== excludeKey && c.listSource === listKey);
+  if (!stillUsed && masters.customLists && masters.customLists[listKey]) {
+    delete masters.customLists[listKey];
+  }
+}
+
+function changeColumnDateFormat(key, format) {
+  const col = getColumnByKey(key);
+  if (!col) return;
+  const needsRerender = format === '__custom__' || col.dateFormat === '__custom__';
+  col.dateFormat = (format === '__custom__') ? 'DD.MM.YYYY' : format;
+  saveState();
+  if (needsRerender) renderMastersContent();
+  refreshAfterColumnConfigChange();
+}
+
+function changeColumnListSource(key, listSource) {
+  const col = getColumnByKey(key);
+  if (!col) return;
+  const oldListSource = col.listSource;
+
+  if (listSource === '__new__') {
+    const proposed = (col.label || 'List') + ' Options';
+    let baseKey = 'custom_' + proposed.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!baseKey || baseKey === 'custom_') baseKey = 'custom_list';
+    let newKey = baseKey, n = 1;
+    while (masters.customLists[newKey]) { newKey = baseKey + '_' + (++n); }
+    masters.customLists[newKey] = [];
+    col.listSource = newKey;
+    cleanupOrphanedList(oldListSource, key);
+    saveState();
+    renderMastersContent();
+    refreshAfterColumnConfigChange();
+    // Jump to the Lists tab so the user can immediately name/seed the new list
+    switchTab('lists');
+    activeListKey = newKey;
+    renderMastersContent();
+    return;
+  }
+
+  col.listSource = listSource || undefined;
+  if (listSource && !masters.customLists[listSource] && listSource !== 'projects' && listSource !== 'natures') {
+    masters.customLists[listSource] = [];
+  }
+  cleanupOrphanedList(oldListSource, key);
+  saveState();
+  renderMastersContent();
+  refreshAfterColumnConfigChange();
+}
+
+// Toggle one of the three independent visibility flags for a column:
+// 'showInTaskCard', 'showInLogTable', or 'showInCompletePopup'.
+function toggleColumnContext(key, flagName) {
+  const col = getColumnByKey(key);
+  if (!col) return;
+  col[flagName] = col[flagName] === false ? true : false;
+  saveState();
+  refreshAfterColumnConfigChange();
+}
+
+function confirmDeleteColumn(key) {
+  const col = getColumnByKey(key);
+  if (!col) return;
+  const listKey = col.listSource;
+  // Only offer to remove the list if it's a custom one (not the shared built-in
+  // Projects/Nature/Status lists) and no other column still points to it.
+  const isRemovableList = listKey && listKey !== 'projects' && listKey !== 'natures' && listKey !== 'statuses'
+    && getLogColumns().filter(c => c.key !== key && c.listSource === listKey).length === 0;
+
+  const extraMsg = isRemovableList
+    ? ' Its dedicated master list "' + listLabel(listKey) + '" will also be deleted since no other column uses it.'
+    : '';
+
+  showConfirm('Delete column "' + col.label + '"?',
+    'This removes the column from the log table, task card, and exports. Already-saved values for this column on existing entries will no longer be shown, but are not erased from storage.' + extraMsg,
+    () => {
+      const cols = getLogColumns();
+      const idx = cols.findIndex(c => c.key === key);
+      if (idx >= 0) cols.splice(idx, 1);
+      if (isRemovableList && masters.customLists) delete masters.customLists[listKey];
+      saveState();
+      renderMastersContent();
+      refreshAfterColumnConfigChange();
+    }, 'Delete');
+}
+
+function addCustomColumn() {
+  const inp = document.getElementById('new-column-label');
+  const typeSel = document.getElementById('new-column-type');
+  const label = inp.value.trim();
+  if (!label) { inp.classList.add('invalid'); return; }
+  inp.classList.remove('invalid');
+  const type = typeSel.value;
+  // Generate a unique, storage-safe key from the label
+  let baseKey = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (!baseKey || baseKey === 'custom_') baseKey = 'custom_field';
+  let key = baseKey, n = 1;
+  const existingKeys = getLogColumns().map(c => c.key);
+  while (existingKeys.includes(key)) { key = baseKey + '_' + (++n); }
+
+  const newCol = { key, label, visible: true, type, builtIn: false };
+  if (type === 'date') newCol.dateFormat = 'DD-MM-YYYY';
+  if (type === 'list') {
+    newCol.listSource = key; // each new list column gets its own dedicated master list
+    if (!masters.customLists[key]) masters.customLists[key] = [];
+  }
+  getLogColumns().push(newCol);
+  saveState();
+  inp.value = '';
+  refreshAfterColumnConfigChange();
+  if (type === 'list') {
+    // Jump straight to managing the new list's options so the user can seed it immediately
+    switchTab('lists');
+    activeListKey = key;
+    renderMastersContent();
+  } else {
+    renderMastersContent();
+  }
+}
+
+// Re-render anything on screen that depends on column config (task cards, log table, popup)
+function refreshAfterColumnConfigChange() {
+  updateLogTable();
+  tasks.forEach(t => { if (t.status !== 'done') renderRow(t.id); });
+}
+
+// ── Drag-and-drop reorder for the Columns tab (configurable columns only) ──
+let colDragSrcIdx = null;
+function colDragStart(e, idx) {
+  colDragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(idx));
+  e.currentTarget.classList.add('dragging');
+}
+function colDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (idx !== colDragSrcIdx) e.currentTarget.classList.add('drag-over');
+}
+function colDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function colDrop(e, targetIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (colDragSrcIdx === null || colDragSrcIdx === targetIdx) return;
+  const cols = getLogColumns();
+  const srcCol = cols[colDragSrcIdx];
+  if (!srcCol) { colDragSrcIdx = null; return; }
+  const [moved] = cols.splice(colDragSrcIdx, 1);
+  cols.splice(targetIdx, 0, moved);
+  saveState();
+  renderMastersContent();
+  refreshAfterColumnConfigChange();
+  colDragSrcIdx = null;
+}
+function colDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('#columns-list-container .master-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  colDragSrcIdx = null;
+}
+
+// ── Custom list management (bulk add / delete) for list-type columns ───────
+function bulkAddCustomListItems(listKey) {
+  const inp = document.getElementById('bulk-list-input');
+  if (!inp) return;
+  const raw = inp.value;
+  if (!raw.trim()) return;
+  if (!masters.customLists[listKey]) masters.customLists[listKey] = [];
+  const items = raw.split(',').map(s => s.trim()).filter(Boolean);
+  items.forEach(item => {
+    if (!masters.customLists[listKey].includes(item)) masters.customLists[listKey].push(item);
+  });
+  saveState();
+  inp.value = '';
+  renderMastersContent();
+  refreshAfterColumnConfigChange();
+}
+
+function deleteCustomListItem(listKey, idx) {
+  if (!masters.customLists[listKey]) return;
+  masters.customLists[listKey].splice(idx, 1);
+  saveState();
+  renderMastersContent();
+  refreshAfterColumnConfigChange();
+}
+
+// Jump from the Columns tab's "Manage list" button straight to that list inside the
+// consolidated Lists tab.
+function goToListInListsTab(listKey) {
+  activeListKey = listKey;
+  switchTab('lists');
+}
+
+// ── Drag-and-drop reorder for items within the Lists tab ───────────────────
+let listItemDragSrcIdx = null;
+function listItemDragStart(e, idx) {
+  listItemDragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(idx));
+  e.currentTarget.classList.add('dragging');
+}
+function listItemDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (idx !== listItemDragSrcIdx) e.currentTarget.classList.add('drag-over');
+}
+function listItemDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function listItemDrop(e, targetIdx) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (listItemDragSrcIdx === null || listItemDragSrcIdx === targetIdx) return;
+  const items = masters.customLists[activeListKey];
+  if (!items) return;
+  const [moved] = items.splice(listItemDragSrcIdx, 1);
+  items.splice(targetIdx, 0, moved);
+  saveState();
+  renderMastersContent();
+  refreshAfterColumnConfigChange();
+  listItemDragSrcIdx = null;
+}
+function listItemDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('#lists-tab-container .master-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+  listItemDragSrcIdx = null;
+}
+
 // ── Confirm ───────────────────────────────────────────────────────────────────
 function showConfirm(title,msg,cb,yesLabel='Delete') {
   confirmCallback=cb;
@@ -2190,21 +3110,16 @@ function copyLog() {
   const filtered = logEntries.filter(e => entryMatchesDate(e, selDate));
   if (filtered.length === 0) { alert('No entries to copy for this date.'); return; }
 
+  const cols = getVisibleLogColumns();
   const rows = filtered.map(e => {
     const task = tasks.find(t=>t.id===e.taskId);
-    const secs = e.durationSecs!==null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
-    const startD = new Date(e.startTs);
-    return [
-      fmtDate(startD),
-      e.employee || userName,
-      e.project||'',
-      e.module||'',
-      e.nature||'',
-      e.ticket||'',
-      e.description||'',
-      Math.ceil(secs/60),
-      e.taskStatus || (e.endTs ? 'Completed' : (task ? task.status : ''))
-    ].join('\t');
+    return cols.map(c => {
+      if (c.key === 'effort') {
+        const secs = e.durationSecs!==null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+        return Math.ceil(secs/60);
+      }
+      return getExportValueForColumn(e, task, c.key);
+    }).join('\t');
   });
 
   const text = rows.join('\n');
@@ -2242,9 +3157,6 @@ function openCSVModal() {
   document.getElementById('csv-modal').classList.remove('hidden');
 }
 
-const CSV_HEADERS = ['Date','Employee Name','Project','Module / Feature','Nature of Task',
-  'Ticket # if support ticket','Task progress / Effort description','Effort (Minutes)','Status'];
-
 function csvEscape(val) {
   const s = String(val == null ? '' : val);
   if (s.includes(',') || s.includes('"') || s.includes('\n'))
@@ -2266,22 +3178,18 @@ function exportCSV() {
   const rows = logEntries.filter(e => entryInDateRange(e, from, to));
   if (rows.length === 0) { alert('No entries found for the selected date range.'); return; }
 
-  const lines = [CSV_HEADERS.join(',')];
+  const cols = getVisibleLogColumns();
+  const headerLine = cols.map(c => csvEscape(c.label)).join(',');
+  const lines = [headerLine];
   rows.forEach(e => {
     const task = tasks.find(t => t.id === e.taskId);
-    const secs = e.durationSecs != null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
-    const d = new Date(e.startTs);
-    lines.push([
-      fmtDate(d),
-      e.employee || userName,
-      e.project || '',
-      e.module  || '',
-      e.nature  || '',
-      e.ticket  || '',
-      e.description || '',
-      Math.ceil(secs / 60),
-      e.taskStatus || (e.endTs ? 'Completed' : (task ? task.status : ''))
-    ].map(csvEscape).join(','));
+    lines.push(cols.map(c => {
+      if (c.key === 'effort') {
+        const secs = e.durationSecs != null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+        return Math.ceil(secs / 60);
+      }
+      return getExportValueForColumn(e, task, c.key);
+    }).map(csvEscape).join(','));
   });
 
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -2313,42 +3221,40 @@ function processCSVFile(file) {
       const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
       const dataRows = lines.slice(1);
 
-      // Map column indices by header name (flexible + alias matching)
-      const HEADER_ALIASES = {
-        'Date': ['Date'],
-        'Employee Name': ['Employee Name','Employee','Name'],
-        'Project': ['Project'],
-        'Module / Feature': ['Module / Feature','Module','Feature'],
-        'Nature of Task': ['Nature of Task','Nature'],
-        'Ticket # if support ticket': ['Ticket # if support ticket','Ticket #','Ticket'],
-        'Task progress / Effort description': ['Task progress / Effort description','Task progress / Effrot description','Description','Effort Description','Task Description'],
-        'Effort (Minutes)': ['Effort (Minutes)','Effort','Minutes','Effort (Min)'],
-        'Status': ['Status'],
-        'Remarks': ['Remarks','Remark','Notes','Note']
+      // Map column indices by header name. Primary alias is each column's CURRENT
+      // configured label (so renamed columns map correctly); built-in columns also
+      // keep their original default labels + a few common variants as fallback aliases
+      // so standard/legacy exports still import even if the column was since renamed.
+      const LEGACY_ALIASES = {
+        date:        ['Date'],
+        employee:    ['Employee Name','Employee','Name'],
+        project:     ['Project'],
+        module:      ['Module / Feature','Module','Feature'],
+        nature:      ['Nature of Task','Nature'],
+        ticket:      ['Ticket # if support ticket','Ticket #','Ticket'],
+        description: ['Task progress / Effort description','Task progress / Effrot description','Description','Effort Description','Task Description'],
+        effort:      ['Effort (Minutes)','Effort','Minutes','Effort (Min)'],
+        status:      ['Status'],
+        remark:      ['Remarks','Remark','Notes','Note']
       };
-      const col = {};
-      Object.entries(HEADER_ALIASES).forEach(([key, aliases]) => {
-        col[key] = -1;
+      const cols = getLogColumns(); // all columns, locked + configurable + custom, in configured order
+      const col = {}; // colKey -> header index, or -1 if not found in the uploaded file
+      cols.forEach(c => {
+        const aliases = [c.label, ...(LEGACY_ALIASES[c.key] || [])];
+        col[c.key] = -1;
         for (const a of aliases) {
           const idx = header.findIndex(h => h.toLowerCase() === a.toLowerCase());
-          if (idx >= 0) { col[key] = idx; break; }
+          if (idx >= 0) { col[c.key] = idx; break; }
         }
       });
-
       let imported = 0, skipped = 0;
       dataRows.forEach(line => {
         const vals = parseCSVLine(line);
-        const dateStr = vals[col['Date']] || '';
-        // Normalize date from DD-MM-YYYY to YYYY-MM-DD for range check
-        let iso = dateStr;
-        const parts = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-        if (parts) iso = parts[3] + '-' + parts[2] + '-' + parts[1];
-
-        if (from && iso < from) { skipped++; return; }
-        if (to   && iso > to)   { skipped++; return; }
+        const getVal = (key) => (col[key] >= 0 ? (vals[col[key]] || '') : '');
+        const dateStr = getVal('date');
 
         // Parse date: supports DD-MM-YYYY and DD-Mon-YY / DD-Mon-YYYY
-        let startTs;
+        let startTs, iso;
         const numMatch = dateStr.match(/^(\d{1,2})-(\d{2})-(\d{4})$/);
         const monMatch = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
         if (numMatch) {
@@ -2363,25 +3269,34 @@ function processCSVFile(file) {
           iso = yr + '-' + String(mo+1).padStart(2,'0') + '-' + String(dy).padStart(2,'0');
         } else {
           startTs = Date.now();
+          iso = dateStr; // fallback, won't match range checks below if malformed
         }
 
-        const mins = parseInt(vals[col['Effort (Minutes)']] || '0', 10) || 0;
+        if (from && iso < from) { skipped++; return; }
+        if (to   && iso > to)   { skipped++; return; }
+
+        const mins = parseInt(getVal('effort') || '0', 10) || 0;
+        const descVal = getVal('description');
         const entry = {
-          taskId: --taskIdCounter, // negative IDs for imported
-          heading: vals[col['Task progress / Effort description']] || '',
-          employee: vals[col['Employee Name']] || userName,
-          project: vals[col['Project']] || '',
-          module: vals[col['Module / Feature']] || '',
-          nature: vals[col['Nature of Task']] || '',
-          ticket: vals[col['Ticket # if support ticket']] || '',
-          description: [
-            vals[col['Task progress / Effort description']],
-            col['Remarks'] >= 0 ? vals[col['Remarks']] : ''
-          ].filter(Boolean).join(' | ') || '',
-          taskStatus: vals[col['Status']] || 'Completed',
+          taskId: --importIdCounter, // separate negative IDs for imported, never collides with real task IDs
+          heading: descVal,
+          employee: getVal('employee') || userName,
+          project: getVal('project'),
+          module: getVal('module'),
+          nature: getVal('nature'),
+          ticket: getVal('ticket'),
+          description: descVal,
+          remark: getVal('remark'),
+          taskStatus: getVal('status') || 'Completed',
           startTs, endTs: startTs + mins * 60000,
           durationSecs: mins * 60,
+          customFields: {}
         };
+        // Custom (user-configured) columns: map by current label if present in the file,
+        // otherwise leave blank for this row — the rest of the row still imports normally.
+        cols.filter(c => !c.builtIn && !['date','employee','effort','status'].includes(c.key)).forEach(c => {
+          entry.customFields[c.key] = getVal(c.key);
+        });
         // Skip duplicates (same date+project+description+duration)
         const isDupe = logEntries.some(e =>
           e.project === entry.project &&
@@ -2423,22 +3338,179 @@ function parseCSVLine(line) {
 }
 
 // ── XLSX export (SheetJS) ─────────────────────────────────────────────────────
+// ── Dashboard: insight into effort log between dates, grouped by any master item ──
+// "Master item" columns are any column backed by a master/list source (listSource set) —
+// Project, Nature of Task, Status, or any custom dropdown column the user has configured.
+function getDashboardGroupableColumns() {
+  return getLogColumns().filter(c => c.type === 'list' && c.listSource);
+}
+
+function openDashboard() {
+  const sel = document.getElementById('dash-groupby');
+  const cols = getDashboardGroupableColumns();
+  const prevValue = sel.value;
+  sel.innerHTML = cols.map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join('');
+  if (cols.some(c => c.key === prevValue)) sel.value = prevValue;
+
+  // Default range: this month, if not already set
+  if (!document.getElementById('dash-from').value || !document.getElementById('dash-to').value) {
+    setDashRangeValues('month');
+  }
+  document.getElementById('dashboard-modal').classList.remove('hidden');
+  renderDashboard();
+}
+
+function closeDashboard() {
+  document.getElementById('dashboard-modal').classList.add('hidden');
+}
+
+function setDashRangeValues(preset) {
+  const now = new Date();
+  let from, to;
+  if (preset === 'week') {
+    const dow = now.getDay(); // 0=Sun
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((dow + 6) % 7));
+    from = monday;
+    to = now;
+  } else if (preset === 'month') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to = now;
+  } else { // all time
+    from = null;
+    to = null;
+  }
+  const toISO = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  document.getElementById('dash-from').value = from ? toISO(from) : '';
+  document.getElementById('dash-to').value = to ? toISO(to) : '';
+}
+
+function setDashRange(preset) {
+  setDashRangeValues(preset);
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const content = document.getElementById('dashboard-content');
+  if (!content) return;
+
+  const from = document.getElementById('dash-from').value;
+  const to = document.getElementById('dash-to').value;
+  const groupKey = document.getElementById('dash-groupby').value;
+  const groupCol = getColumnByKey(groupKey);
+
+  const rows = logEntries.filter(e => entryInDateRange(e, from, to));
+
+  if (rows.length === 0) {
+    content.innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;padding:24px 0;text-align:center">No effort logged in this date range.</div>';
+    return;
+  }
+
+  // Aggregate total minutes + entry count per group value
+  const buckets = {}; // value -> { mins, count }
+  let totalMins = 0;
+  rows.forEach(e => {
+    const task = tasks.find(t => t.id === e.taskId);
+    const secs = e.durationSecs != null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+    const mins = Math.ceil(secs / 60);
+    let val = groupCol ? getEntryValueForColumn(e, task, groupKey) : '';
+    if (!val) val = '(blank)';
+    if (!buckets[val]) buckets[val] = { mins: 0, count: 0 };
+    buckets[val].mins += mins;
+    buckets[val].count += 1;
+    totalMins += mins;
+  });
+
+  const sortedEntries = Object.entries(buckets).sort((a, b) => b[1].mins - a[1].mins);
+  const maxMins = Math.max(...sortedEntries.map(([,v]) => v.mins), 1);
+
+  const minsToHrs = (m) => (m / 60).toFixed(1);
+
+  const summaryHTML = `
+    <div style="display:flex;gap:18px;margin-bottom:18px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:12px 16px">
+        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em">Total effort</div>
+        <div style="font-size:22px;font-weight:600;margin-top:2px">${minsToHrs(totalMins)}h</div>
+        <div style="font-size:11px;color:var(--text-tertiary)">${totalMins} minutes</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:12px 16px">
+        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em">Entries</div>
+        <div style="font-size:22px;font-weight:600;margin-top:2px">${rows.length}</div>
+        <div style="font-size:11px;color:var(--text-tertiary)">in selected range</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:12px 16px">
+        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em">${esc(groupCol ? groupCol.label : 'Groups')}</div>
+        <div style="font-size:22px;font-weight:600;margin-top:2px">${sortedEntries.length}</div>
+        <div style="font-size:11px;color:var(--text-tertiary)">distinct values</div>
+      </div>
+    </div>
+  `;
+
+  const barsHTML = `
+    <div style="margin-bottom:18px">
+      ${sortedEntries.map(([val, v]) => {
+        const pct = Math.round((v.mins / maxMins) * 100);
+        const sharePct = totalMins > 0 ? Math.round((v.mins / totalMins) * 100) : 0;
+        return `<div style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span style="font-weight:500">${esc(val)}</span>
+            <span style="color:var(--text-secondary)">${minsToHrs(v.mins)}h · ${v.count} entr${v.count===1?'y':'ies'} · ${sharePct}%</span>
+          </div>
+          <div style="background:var(--bg-tertiary);border-radius:6px;height:10px;overflow:hidden">
+            <div style="background:var(--blue-mid);height:100%;width:${pct}%;border-radius:6px"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  const tableHTML = `
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:6px 8px;color:var(--text-secondary)">${esc(groupCol ? groupCol.label : 'Group')}</th>
+          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">Hours</th>
+          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">Minutes</th>
+          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">Entries</th>
+          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">% of total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sortedEntries.map(([val, v]) => `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px">${esc(val)}</td>
+          <td style="text-align:right;padding:6px 8px">${minsToHrs(v.mins)}</td>
+          <td style="text-align:right;padding:6px 8px">${v.mins}</td>
+          <td style="text-align:right;padding:6px 8px">${v.count}</td>
+          <td style="text-align:right;padding:6px 8px">${totalMins>0?Math.round((v.mins/totalMins)*100):0}%</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+
+  content.innerHTML = summaryHTML + barsHTML + tableHTML;
+}
+
 function exportXLSX() {
-  const logHeaders = ['Date','Employee Name','Project','Module / Feature','Nature of Task','Ticket # if support ticket','Task progress / Effort description','Effort (Minutes)','Status'];
+  const cols = getVisibleLogColumns();
+  const logHeaders = cols.map(c => c.label);
   const logRows = logEntries.map(e => {
     const task = tasks.find(t=>t.id===e.taskId);
-    const secs = e.durationSecs!==null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
-    const startD=new Date(e.startTs);
-    return [
-      fmtDate(startD), e.employee || userName, e.project||'', e.module||'', e.nature||'', e.ticket||'',
-      e.description||'',
-      Math.ceil(secs/60),
-      e.taskStatus || (e.endTs ? 'Completed' : (task ? task.status : ''))
-    ];
+    return cols.map(c => {
+      if (c.key === 'effort') {
+        const secs = e.durationSecs!==null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+        return Math.ceil(secs/60);
+      }
+      return getExportValueForColumn(e, task, c.key);
+    });
+  });
+  const customListRows = Object.entries(masters.customLists || {}).flatMap(([listKey, vals]) => {
+    const ownerCol = getLogColumns().find(c => c.listSource === listKey);
+    const label = ownerCol ? ownerCol.label : listKey;
+    return vals.map(v => [label, v]);
   });
   const masterRows=[
-    ...masters.projects.map(v=>['Project',v]),
-    ...masters.natures.map(v=>['Nature of Task',v])
+    ...masters.customLists.projects.map(v=>['Project',v]),
+    ...masters.customLists.natures.map(v=>['Nature of Task',v]),
+    ...customListRows
   ];
 
   const wb = XLSX.utils.book_new();
@@ -2825,8 +3897,46 @@ function restoreIntervals() {
   });
 }
 
+// ── Theme: light / dark / system ────────────────────────────────────────────
+function getStoredTheme() {
+  try { return localStorage.getItem('ttl_theme') || 'system'; } catch (e) { return 'system'; }
+}
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'light' || theme === 'dark') {
+    root.setAttribute('data-theme', theme);
+  } else {
+    root.removeAttribute('data-theme'); // 'system' — let prefers-color-scheme decide
+  }
+  const icon = document.getElementById('theme-toggle-icon');
+  const label = document.getElementById('theme-toggle-label');
+  if (icon && label) {
+    if (theme === 'light') { icon.className = 'ti ti-sun'; label.textContent = 'Light'; }
+    else if (theme === 'dark') { icon.className = 'ti ti-moon'; label.textContent = 'Dark'; }
+    else { icon.className = 'ti ti-device-desktop'; label.textContent = 'System'; }
+  }
+}
+
+function setTheme(theme) {
+  try { localStorage.setItem('ttl_theme', theme); } catch (e) {}
+  applyTheme(theme);
+}
+
+function cycleTheme() {
+  const order = ['light', 'dark', 'system'];
+  const current = getStoredTheme();
+  const next = order[(order.indexOf(current) + 1) % order.length];
+  setTheme(next);
+}
+
+function initTheme() {
+  applyTheme(getStoredTheme());
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 loadState();
+initTheme();
 if (typeof Notification !== 'undefined' && Notification.permission === 'default') { Notification.requestPermission(); }
 checkUserNamePrompt();
 initDatePicker();
