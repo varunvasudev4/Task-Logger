@@ -28,7 +28,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -641,13 +640,13 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
       <div class="subtitle">Track effort · saved in browser · exports to XLSX</div>
     </div>
     <div class="header-actions">
+      <button class="btn" onclick="openCSVModal()"><i class="ti ti-file-text"></i> CSV</button>
       <div class="date-picker-wrap" onclick="try{document.getElementById('log-date-input').showPicker()}catch(e){document.getElementById('log-date-input').click()}">
         <i class="ti ti-calendar"></i>
         <input type="date" id="log-date-input" class="date-picker-input" onchange="onDateChange()" />
         <span id="today-badge" class="date-today-badge">Today</span>
       </div>
       <button class="btn" onclick="cycleTheme()" id="theme-toggle-btn" title="Switch theme"><i class="ti ti-sun" id="theme-toggle-icon"></i> <span id="theme-toggle-label">Light</span></button>
-      <button class="btn" onclick="openDashboard()"><i class="ti ti-chart-bar"></i> Dashboard</button>
       <button class="btn" onclick="openMasters()"><i class="ti ti-list-details"></i> Masters</button>
       <button class="btn btn-primary" onclick="addTask()"><i class="ti ti-plus"></i> Add task</button>
     </div>
@@ -672,7 +671,6 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
         <div class="log-count" id="log-count">0 entries</div>
       </div>
       <div class="log-header-actions">
-        <button class="btn" onclick="openCSVModal()"><i class="ti ti-file-text"></i> CSV</button>
         <button class="btn" onclick="copyLog()" id="copy-btn"><i class="ti ti-clipboard-copy"></i> Copy</button>
         <button class="btn" onclick="clearLog()"><i class="ti ti-trash"></i> Clear log</button>
         <button class="btn btn-primary" onclick="exportXLSX()"><i class="ti ti-file-spreadsheet"></i> Download XLSX</button>
@@ -820,6 +818,72 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
   </div>
 </div>
 
+<!-- Make Recurring modal -->
+<div class="modal-overlay hidden" id="make-recurring-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-repeat" style="vertical-align:-2px;margin-right:6px;color:var(--green-mid)"></i>Make Recurring</div>
+      <button class="btn-icon" onclick="closeMakeRecurringModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="mr-task-name" style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-primary)"></div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">
+        This will auto-create a fresh, Not Started copy of this task every working day as you navigate
+        forward, like a daily checklist item.
+      </div>
+      <div class="complete-row">
+        <div class="complete-field">
+          <label class="complete-label">Start date</label>
+          <input class="complete-input" id="mr-start-date" type="date" style="width:100%" onchange="syncRecurringEndDateMin()" />
+        </div>
+        <div class="complete-field">
+          <label class="complete-label">End date</label>
+          <input class="complete-input" id="mr-end-date" type="date" style="width:100%" />
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);margin:4px 0 12px;cursor:pointer">
+        <input type="checkbox" id="mr-no-end-date" checked onchange="toggleMakeRecurringNoEndDate()" />
+        No end date — repeat indefinitely
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer">
+        <input type="checkbox" id="mr-include-weekends" />
+        Also appear on weekends (otherwise it only appears on working days)
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeMakeRecurringModal()">Cancel</button>
+      <button class="btn btn-primary" id="mr-confirm-btn" onclick="confirmMakeRecurring()"><i class="ti ti-check"></i> Make Recurring</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Recurring modal -->
+<div class="modal-overlay hidden" id="manage-recurring-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-repeat" style="vertical-align:-2px;margin-right:6px;color:var(--green-mid)"></i>Manage Recurring Task</div>
+      <button class="btn-icon" onclick="closeManageRecurringModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="rm-task-name" style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text-primary)"></div>
+      <div id="rm-plan-summary" style="font-size:12px;color:var(--text-secondary);margin-bottom:16px"></div>
+      <div style="border-top:1px solid var(--border);padding-top:14px">
+        <label class="complete-label" style="display:block;margin-bottom:6px">Disable from date</label>
+        <input class="complete-input" id="rm-disable-date" type="date" style="width:100%;margin-bottom:8px" />
+        <div style="font-size:11px;color:var(--text-tertiary)">
+          This task will stop appearing on or after the chosen date. Any future Not Started instances
+          already created on or after that date will be removed. Past and already-started instances are
+          never touched.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeManageRecurringModal()">Cancel</button>
+      <button class="btn btn-danger" id="rm-disable-btn" onclick="confirmDisableRecurring()"><i class="ti ti-ban"></i> Disable Recurring</button>
+    </div>
+  </div>
+</div>
+
 <!-- Masters modal -->
 <div class="modal-overlay hidden" id="masters-modal">
   <div class="modal" id="masters-modal-box" style="max-width:480px">
@@ -843,41 +907,6 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeMasters()">Done</button>
-    </div>
-  </div>
-</div>
-
-<!-- Dashboard modal -->
-<div class="modal-overlay hidden" id="dashboard-modal">
-  <div class="modal" id="dashboard-modal-box" style="max-width:760px">
-    <div class="modal-header">
-      <div class="modal-title"><i class="ti ti-chart-bar" style="vertical-align:-2px;margin-right:6px"></i>Effort Dashboard</div>
-      <button class="btn-icon" onclick="closeDashboard()"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
-        <div class="complete-field" style="flex:0 0 auto">
-          <label class="complete-label">From</label>
-          <input class="complete-input" id="dash-from" type="date" onchange="renderDashboard()" />
-        </div>
-        <div class="complete-field" style="flex:0 0 auto">
-          <label class="complete-label">To</label>
-          <input class="complete-input" id="dash-to" type="date" onchange="renderDashboard()" />
-        </div>
-        <div class="complete-field" style="flex:0 0 auto">
-          <label class="complete-label">Group by</label>
-          <select class="complete-select" id="dash-groupby" onchange="renderDashboard()"></select>
-        </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn" onclick="setDashRange('week')">This week</button>
-          <button class="btn" onclick="setDashRange('month')">This month</button>
-          <button class="btn" onclick="setDashRange('all')">All time</button>
-        </div>
-      </div>
-      <div id="dashboard-content"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeDashboard()">Close</button>
     </div>
   </div>
 </div>
@@ -1077,6 +1106,11 @@ let userName = '';
 let tasks = [];
 let logEntries = [];
 let taskIdCounter = 0;
+let recurringPlans = []; // { id, heading, project, nature, module, ticket, customFields,
+                          //   startDate (YYYY-MM-DD), endDate (YYYY-MM-DD|null = indefinite),
+                          //   includeWeekends, active, disabledFromDate (YYYY-MM-DD|null),
+                          //   generatedDates: [YYYY-MM-DD, ...] }
+let recurringPlanIdCounter = 0;
 let importIdCounter = 0; // separate negative-only namespace for CSV-imported entries, never overlaps real task IDs
 let intervals = {};
 let masters = {
@@ -1105,6 +1139,8 @@ function saveState() {
     localStorage.setItem('ttl_import_counter', String(importIdCounter));
     localStorage.setItem('ttl_masters',  JSON.stringify(masters));
     localStorage.setItem('ttl_username', userName);
+    localStorage.setItem('ttl_recurring_plans', JSON.stringify(recurringPlans));
+    localStorage.setItem('ttl_recurring_counter', String(recurringPlanIdCounter));
   } catch(e) {}
 }
 
@@ -1116,6 +1152,10 @@ function loadState() {
     const importCounter = localStorage.getItem('ttl_import_counter');
     const m = localStorage.getItem('ttl_masters');
     const u = localStorage.getItem('ttl_username');
+    const rp = localStorage.getItem('ttl_recurring_plans');
+    const rpCounter = localStorage.getItem('ttl_recurring_counter');
+    if (rp) { try { recurringPlans = JSON.parse(rp) || []; } catch(e) { recurringPlans = []; } }
+    if (rpCounter) recurringPlanIdCounter = parseInt(rpCounter) || 0;
     if (t) tasks = JSON.parse(t);
     if (l) {
       const allEntries = JSON.parse(l);
@@ -2018,15 +2058,20 @@ function continueTomorrow(taskId) {
   const heading = (entry && entry.heading) || (task && task.heading) || 'Untitled';
   document.getElementById('cf-task-name').textContent = heading;
 
-  // Default the date field to the day after the entry's own date —
-  // not real-world today — so carrying forward a past day's entry
-  // defaults sensibly to the day right after it.
+  // Default the date field to the day after the entry's own date — not real-world
+  // today — so carrying forward a past day's entry defaults sensibly to the day
+  // right after it. Never default to (or allow) a date before today, though:
+  // carried-forward and recurring tasks can only target present/future dates.
   const baseDate = entry ? new Date(entry.startTs) : new Date();
   const nextDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + 1);
-  const nextDayStr = nextDay.getFullYear() + '-' +
+  let nextDayStr = nextDay.getFullYear() + '-' +
     String(nextDay.getMonth() + 1).padStart(2, '0') + '-' +
     String(nextDay.getDate()).padStart(2, '0');
-  document.getElementById('cf-date').value = nextDayStr;
+  const today = todayStr();
+  if (nextDayStr < today) nextDayStr = today;
+  const dateInp = document.getElementById('cf-date');
+  dateInp.value = nextDayStr;
+  dateInp.min = today; // never allow picking a past date
 
   document.getElementById('carry-forward-modal').classList.remove('hidden');
 }
@@ -2042,6 +2087,12 @@ function confirmCarryForward() {
 
   const chosenDateStr = document.getElementById('cf-date').value;
   if (!chosenDateStr) { document.getElementById('cf-date').classList.add('invalid'); return; }
+  if (chosenDateStr < todayStr()) {
+    document.getElementById('cf-date').classList.add('invalid');
+    alert('Carried-forward tasks can only be added to today or a future date.');
+    return;
+  }
+  document.getElementById('cf-date').classList.remove('invalid');
 
   const task = tasks.find(t => t.id === taskId);
   const entry = [...logEntries].reverse().find(e => e.taskId === taskId);
@@ -2099,6 +2150,188 @@ function confirmCarryForward() {
   }
 }
 
+// ── Make Recurring modal ─────────────────────────────────────────────────────
+let pendingRecurringTaskId = null;
+
+function openMakeRecurringModal(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  const entry = [...logEntries].reverse().find(e => e.taskId === taskId);
+  if (!task && !entry) return;
+
+  pendingRecurringTaskId = taskId;
+  const heading = (entry && entry.heading) || (task && task.heading) || 'Untitled';
+  document.getElementById('mr-task-name').textContent = heading;
+
+  const start = todayStr();
+  document.getElementById('mr-start-date').value = start;
+  document.getElementById('mr-start-date').min = start; // never start a plan in the past
+  document.getElementById('mr-end-date').value = '';
+  document.getElementById('mr-end-date').disabled = true;
+  document.getElementById('mr-end-date').min = start;
+  document.getElementById('mr-no-end-date').checked = true;
+  document.getElementById('mr-include-weekends').checked = false;
+
+  document.getElementById('make-recurring-modal').classList.remove('hidden');
+}
+
+function closeMakeRecurringModal() {
+  document.getElementById('make-recurring-modal').classList.add('hidden');
+  pendingRecurringTaskId = null;
+}
+
+function toggleMakeRecurringNoEndDate() {
+  const noEnd = document.getElementById('mr-no-end-date').checked;
+  const endInp = document.getElementById('mr-end-date');
+  endInp.disabled = noEnd;
+  if (noEnd) endInp.value = '';
+}
+
+function syncRecurringEndDateMin() {
+  const startInp = document.getElementById('mr-start-date');
+  const endInp = document.getElementById('mr-end-date');
+  const today = todayStr();
+  // Never allow a start date before today, even if picked via manual typing
+  if (startInp.value && startInp.value < today) startInp.value = today;
+  const effectiveMin = startInp.value || today;
+  endInp.min = effectiveMin;
+  if (endInp.value && endInp.value < effectiveMin) endInp.value = '';
+}
+
+function confirmMakeRecurring() {
+  const taskId = pendingRecurringTaskId;
+  if (taskId == null) return;
+
+  const task = tasks.find(t => t.id === taskId);
+  const entry = [...logEntries].reverse().find(e => e.taskId === taskId);
+  if (!task && !entry) { closeMakeRecurringModal(); return; }
+
+  const startDate = document.getElementById('mr-start-date').value;
+  if (!startDate) { document.getElementById('mr-start-date').classList.add('invalid'); return; }
+  if (startDate < todayStr()) {
+    document.getElementById('mr-start-date').classList.add('invalid');
+    alert('A recurring plan can only start today or on a future date.');
+    return;
+  }
+  document.getElementById('mr-start-date').classList.remove('invalid');
+
+  const noEndDate = document.getElementById('mr-no-end-date').checked;
+  const endDate = noEndDate ? null : (document.getElementById('mr-end-date').value || null);
+  if (endDate && endDate < startDate) {
+    document.getElementById('mr-end-date').classList.add('invalid');
+    alert('End date can\'t be before the start date.');
+    return;
+  }
+  document.getElementById('mr-end-date').classList.remove('invalid');
+  const includeWeekends = document.getElementById('mr-include-weekends').checked;
+
+  const heading = (entry && entry.heading) || (task && task.heading) || '';
+  const project = (entry && entry.project) || (task && task.project) || '';
+  const nature  = (entry && entry.nature)  || (task && task.nature)  || '';
+  const module  = (entry && entry.module)  || (task && task.module)  || '';
+  const ticket  = (entry && entry.ticket)  || (task && task.ticket)  || '';
+  const customFields = { ...((entry && entry.customFields) || (task && task.customFields) || {}) };
+
+  const planId = ++recurringPlanIdCounter;
+  const plan = {
+    id: planId, heading, project, nature, module, ticket, customFields,
+    startDate, endDate, includeWeekends, active: true, disabledFromDate: null,
+    generatedDates: []
+  };
+  recurringPlans.push(plan);
+
+  // Link the source task to this plan so it shows the "manage" button immediately,
+  // and so its own card doesn't get duplicated by today's materialization pass.
+  if (task) task.recurringPlanId = planId;
+  if (task && dateToStr(new Date(task.createdAt)) === startDate) {
+    plan.generatedDates.push(startDate); // today's instance already exists (this task itself)
+  }
+
+  saveState();
+  materializeRecurringTasksUpTo(getSelectedDate());
+  closeMakeRecurringModal();
+  updateLogTable();
+  tasks.forEach(t => { if (t.status !== 'done') renderRow(t.id); });
+  renderList();
+
+  const notice = document.getElementById('wake-notice');
+  if (notice) {
+    notice.textContent = '🔁 "' + (heading || 'Untitled') + '" is now recurring on working days';
+    notice.style.background = 'var(--green-mid)';
+    notice.classList.add('show');
+    setTimeout(() => {
+      notice.classList.remove('show');
+      notice.style.background = '';
+      notice.textContent = '⏱ Timers refreshed after wake';
+    }, 4000);
+  }
+}
+
+// ── Manage / Disable Recurring modal ────────────────────────────────────────
+let pendingManageRecurringPlanId = null;
+
+function openManageRecurringModal(planId) {
+  const plan = recurringPlans.find(p => p.id === planId);
+  if (!plan) return;
+  pendingManageRecurringPlanId = planId;
+
+  document.getElementById('rm-task-name').textContent = plan.heading || 'Untitled';
+  const freq = plan.includeWeekends ? 'every day (including weekends)' : 'working days only';
+  const range = plan.endDate
+    ? ('from ' + plan.startDate + ' through ' + plan.endDate)
+    : ('from ' + plan.startDate + ', indefinitely');
+  document.getElementById('rm-plan-summary').textContent = 'Repeats on ' + freq + ', ' + range + '.';
+
+  const tomorrow = addDaysStr(todayStr(), 1);
+  const disableInp = document.getElementById('rm-disable-date');
+  disableInp.value = tomorrow;
+  disableInp.min = todayStr();
+
+  document.getElementById('manage-recurring-modal').classList.remove('hidden');
+}
+
+function closeManageRecurringModal() {
+  document.getElementById('manage-recurring-modal').classList.add('hidden');
+  pendingManageRecurringPlanId = null;
+}
+
+function confirmDisableRecurring() {
+  const planId = pendingManageRecurringPlanId;
+  if (planId == null) return;
+  const plan = recurringPlans.find(p => p.id === planId);
+  if (!plan) { closeManageRecurringModal(); return; }
+
+  const fromDate = document.getElementById('rm-disable-date').value;
+  if (!fromDate) { document.getElementById('rm-disable-date').classList.add('invalid'); return; }
+  if (fromDate < todayStr()) {
+    document.getElementById('rm-disable-date').classList.add('invalid');
+    alert('You can only disable a recurring plan from today or a future date — past days already happened.');
+    return;
+  }
+  document.getElementById('rm-disable-date').classList.remove('invalid');
+
+  showConfirm(
+    'Disable recurring task?',
+    'Stop "' + (plan.heading || 'Untitled') + '" from appearing on or after ' + fromDate + '. Any already-created future Not Started instances on or after that date will be removed. This cannot be undone.',
+    () => {
+      disableRecurringPlanFrom(planId, fromDate);
+      closeManageRecurringModal();
+      updateLogTable();
+      renderList();
+      const notice = document.getElementById('wake-notice');
+      if (notice) {
+        notice.textContent = '🔁 Recurring task disabled from ' + fromDate;
+        notice.style.background = 'var(--amber-mid)';
+        notice.classList.add('show');
+        setTimeout(() => {
+          notice.classList.remove('show');
+          notice.style.background = '';
+          notice.textContent = '⏱ Timers refreshed after wake';
+        }, 4000);
+      }
+    },
+    'Disable'
+  );
+}
 
 // ── Reopen a completed task back to the task list ────────────────────────────
 function reopenTask(taskId) {
@@ -2477,6 +2710,9 @@ function updateLogTable() {
       return `<td>${esc(getEntryValueForColumn(e, task, c.key))}</td>`;
     }).join('');
 
+    const rowTask = tasks.find(t => t.id === e.taskId);
+    const linkedPlan = (rowTask && rowTask.recurringPlanId) ? recurringPlans.find(p => p.id === rowTask.recurringPlanId && p.active) : null;
+
     return `<tr>
       ${cells}
       <td>
@@ -2485,6 +2721,9 @@ function updateLogTable() {
         ${statusText==='In Progress'
             ? '<button class="btn-icon" id="continue-'+e.taskId+'" onclick="continueTomorrow('+e.taskId+')" title="Add this task to another day" style="border-color:var(--blue-mid);color:var(--blue-dark)"><i class="ti ti-calendar-plus"></i></button>'
             : (selDate === todayStr() ? '<button class="btn-icon" onclick="reopenTask('+e.taskId+')" title="Reopen task" style="border-color:var(--amber-mid);color:var(--amber-dark)"><i class="ti ti-refresh"></i></button>' : '')}
+        ${linkedPlan
+            ? '<button class="btn-icon" onclick="openManageRecurringModal('+linkedPlan.id+')" title="Manage recurring plan" style="border-color:var(--green-mid);color:var(--green-dark)"><i class="ti ti-repeat"></i></button>'
+            : '<button class="btn-icon" onclick="openMakeRecurringModal('+e.taskId+')" title="Make this a recurring daily task" style="border-color:var(--green-mid);color:var(--green-dark)"><i class="ti ti-repeat"></i></button>'}
         ${selDate === todayStr() ? '<button class="btn-icon btn-delete" onclick="confirmDeleteLogEntry('+logEntries.indexOf(e)+')" title="Delete entry"><i class="ti ti-trash"></i></button>' : ''}
         </div>
       </td>
@@ -3349,157 +3588,6 @@ function parseCSVLine(line) {
 }
 
 // ── XLSX export (SheetJS) ─────────────────────────────────────────────────────
-// ── Dashboard: insight into effort log between dates, grouped by any master item ──
-// "Master item" columns are any column backed by a master/list source (listSource set) —
-// Project, Nature of Task, Status, or any custom dropdown column the user has configured.
-function getDashboardGroupableColumns() {
-  return getLogColumns().filter(c => c.type === 'list' && c.listSource);
-}
-
-function openDashboard() {
-  const sel = document.getElementById('dash-groupby');
-  const cols = getDashboardGroupableColumns();
-  const prevValue = sel.value;
-  sel.innerHTML = cols.map(c => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join('');
-  if (cols.some(c => c.key === prevValue)) sel.value = prevValue;
-
-  // Default range: this month, if not already set
-  if (!document.getElementById('dash-from').value || !document.getElementById('dash-to').value) {
-    setDashRangeValues('month');
-  }
-  document.getElementById('dashboard-modal').classList.remove('hidden');
-  renderDashboard();
-}
-
-function closeDashboard() {
-  document.getElementById('dashboard-modal').classList.add('hidden');
-}
-
-function setDashRangeValues(preset) {
-  const now = new Date();
-  let from, to;
-  if (preset === 'week') {
-    const dow = now.getDay(); // 0=Sun
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((dow + 6) % 7));
-    from = monday;
-    to = now;
-  } else if (preset === 'month') {
-    from = new Date(now.getFullYear(), now.getMonth(), 1);
-    to = now;
-  } else { // all time
-    from = null;
-    to = null;
-  }
-  const toISO = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-  document.getElementById('dash-from').value = from ? toISO(from) : '';
-  document.getElementById('dash-to').value = to ? toISO(to) : '';
-}
-
-function setDashRange(preset) {
-  setDashRangeValues(preset);
-  renderDashboard();
-}
-
-function renderDashboard() {
-  const content = document.getElementById('dashboard-content');
-  if (!content) return;
-
-  const from = document.getElementById('dash-from').value;
-  const to = document.getElementById('dash-to').value;
-  const groupKey = document.getElementById('dash-groupby').value;
-  const groupCol = getColumnByKey(groupKey);
-
-  const rows = logEntries.filter(e => entryInDateRange(e, from, to));
-
-  if (rows.length === 0) {
-    content.innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;padding:24px 0;text-align:center">No effort logged in this date range.</div>';
-    return;
-  }
-
-  // Aggregate total minutes + entry count per group value
-  const buckets = {}; // value -> { mins, count }
-  let totalMins = 0;
-  rows.forEach(e => {
-    const task = tasks.find(t => t.id === e.taskId);
-    const secs = e.durationSecs != null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
-    const mins = Math.ceil(secs / 60);
-    let val = groupCol ? getEntryValueForColumn(e, task, groupKey) : '';
-    if (!val) val = '(blank)';
-    if (!buckets[val]) buckets[val] = { mins: 0, count: 0 };
-    buckets[val].mins += mins;
-    buckets[val].count += 1;
-    totalMins += mins;
-  });
-
-  const sortedEntries = Object.entries(buckets).sort((a, b) => b[1].mins - a[1].mins);
-  const maxMins = Math.max(...sortedEntries.map(([,v]) => v.mins), 1);
-
-  const minsToHrs = (m) => (m / 60).toFixed(1);
-
-  const summaryHTML = `
-    <div style="display:flex;gap:18px;margin-bottom:18px;flex-wrap:wrap">
-      <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:12px 16px">
-        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em">Total effort</div>
-        <div style="font-size:22px;font-weight:600;margin-top:2px">${minsToHrs(totalMins)}h</div>
-        <div style="font-size:11px;color:var(--text-tertiary)">${totalMins} minutes</div>
-      </div>
-      <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:12px 16px">
-        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em">Entries</div>
-        <div style="font-size:22px;font-weight:600;margin-top:2px">${rows.length}</div>
-        <div style="font-size:11px;color:var(--text-tertiary)">in selected range</div>
-      </div>
-      <div style="flex:1;min-width:120px;background:var(--bg-secondary);border-radius:10px;padding:12px 16px">
-        <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em">${esc(groupCol ? groupCol.label : 'Groups')}</div>
-        <div style="font-size:22px;font-weight:600;margin-top:2px">${sortedEntries.length}</div>
-        <div style="font-size:11px;color:var(--text-tertiary)">distinct values</div>
-      </div>
-    </div>
-  `;
-
-  const barsHTML = `
-    <div style="margin-bottom:18px">
-      ${sortedEntries.map(([val, v]) => {
-        const pct = Math.round((v.mins / maxMins) * 100);
-        const sharePct = totalMins > 0 ? Math.round((v.mins / totalMins) * 100) : 0;
-        return `<div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
-            <span style="font-weight:500">${esc(val)}</span>
-            <span style="color:var(--text-secondary)">${minsToHrs(v.mins)}h · ${v.count} entr${v.count===1?'y':'ies'} · ${sharePct}%</span>
-          </div>
-          <div style="background:var(--bg-tertiary);border-radius:6px;height:10px;overflow:hidden">
-            <div style="background:var(--blue-mid);height:100%;width:${pct}%;border-radius:6px"></div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
-  `;
-
-  const tableHTML = `
-    <table style="width:100%;font-size:12px;border-collapse:collapse">
-      <thead>
-        <tr style="border-bottom:1px solid var(--border)">
-          <th style="text-align:left;padding:6px 8px;color:var(--text-secondary)">${esc(groupCol ? groupCol.label : 'Group')}</th>
-          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">Hours</th>
-          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">Minutes</th>
-          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">Entries</th>
-          <th style="text-align:right;padding:6px 8px;color:var(--text-secondary)">% of total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${sortedEntries.map(([val, v]) => `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:6px 8px">${esc(val)}</td>
-          <td style="text-align:right;padding:6px 8px">${minsToHrs(v.mins)}</td>
-          <td style="text-align:right;padding:6px 8px">${v.mins}</td>
-          <td style="text-align:right;padding:6px 8px">${v.count}</td>
-          <td style="text-align:right;padding:6px 8px">${totalMins>0?Math.round((v.mins/totalMins)*100):0}%</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
-  `;
-
-  content.innerHTML = summaryHTML + barsHTML + tableHTML;
-}
-
 function exportXLSX() {
   const cols = getVisibleLogColumns();
   const logHeaders = cols.map(c => c.label);
@@ -3608,6 +3696,102 @@ function isWeekend(date) {
 }
 function isTodayWeekend() { return isWeekend(new Date()); }
 
+// ── Recurring task plans ─────────────────────────────────────────────────────
+// A plan describes a daily-checklist-style task that should automatically appear
+// as a fresh, idle (Not Started) task instance on working days between a start
+// date and an end date (or indefinitely if no end date is set), optionally
+// including weekends. Disabling a plan from a chosen date stops it from
+// generating any further instances on/after that date, and removes already
+// generated future instances that haven't been started yet.
+
+function dateToStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function strToDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+function addDaysStr(dateStr, n) {
+  const d = strToDate(dateStr);
+  d.setDate(d.getDate() + n);
+  return dateToStr(d);
+}
+
+// Should this plan generate an instance on the given date?
+function planAppliesOnDate(plan, dateStr) {
+  if (!plan.active) return false;
+  if (dateStr < plan.startDate) return false;
+  if (plan.endDate && dateStr > plan.endDate) return false;
+  if (plan.disabledFromDate && dateStr >= plan.disabledFromDate) return false;
+  if (!plan.includeWeekends && isWeekend(strToDate(dateStr))) return false;
+  return true;
+}
+
+// Generate any missing task instances for all active plans, from each plan's
+// start date (or today, whichever is later — we never backfill past days) up
+// through `throughDateStr` inclusive. Safe to call repeatedly; it skips dates
+// that already have a generated instance (tracked in plan.generatedDates).
+function materializeRecurringTasksUpTo(throughDateStr) {
+  if (!recurringPlans || recurringPlans.length === 0) return;
+  const today = todayStr();
+  let changed = false;
+
+  recurringPlans.forEach(plan => {
+    if (!plan.active) return;
+    if (!plan.generatedDates) plan.generatedDates = [];
+    let cursor = plan.startDate > today ? plan.startDate : today; // never backfill before today
+    let safety = 0;
+    while (cursor <= throughDateStr && safety < 3660) { // ~10yr safety cap
+      safety++;
+      if (planAppliesOnDate(plan, cursor) && !plan.generatedDates.includes(cursor)) {
+        const [y, m, d] = cursor.split('-').map(Number);
+        const w = (typeof getWorkHours === 'function') ? getWorkHours() : { startH: 9, startM: 30 };
+        const createdAt = new Date(y, m-1, d, w.startH, w.startM, 0, 0).getTime();
+        const newId = ++taskIdCounter;
+        tasks.unshift({
+          id: newId,
+          heading: plan.heading, project: plan.project, nature: plan.nature,
+          module: plan.module, ticket: plan.ticket,
+          customFields: { ...(plan.customFields || {}) },
+          status: 'idle', accumulatedMs: 0, segmentStart: null, startedAt: null,
+          createdAt, recurringPlanId: plan.id
+        });
+        plan.generatedDates.push(cursor);
+        changed = true;
+      }
+      cursor = addDaysStr(cursor, 1);
+    }
+  });
+
+  if (changed) saveState();
+}
+
+// Disable a plan from a chosen date onward: stop future generation from that
+// date, and remove already-generated future idle (not-yet-started) instances
+// on/after that date.
+function disableRecurringPlanFrom(planId, fromDateStr) {
+  const plan = recurringPlans.find(p => p.id === planId);
+  if (!plan) return;
+  plan.disabledFromDate = fromDateStr;
+  plan.active = false;
+
+  // Remove future idle instances on/after the disable date that haven't been started
+  tasks = tasks.filter(t => {
+    if (t.recurringPlanId !== planId) return true;
+    if (t.status !== 'idle') return true; // never touch started/paused/running/done instances
+    const d = new Date(t.createdAt);
+    const ds = dateToStr(d);
+    if (ds >= fromDateStr) return false; // remove
+    return true;
+  });
+  // Also forget those dates so re-enabling later (if ever) won't think they're already generated
+  if (plan.generatedDates) {
+    plan.generatedDates = plan.generatedDates.filter(ds => ds < fromDateStr);
+  }
+  saveState();
+}
+
+
 // ── Date filter ───────────────────────────────────────────────────────────────
 function todayStr() {
   const d = new Date();
@@ -3621,6 +3805,7 @@ function initDatePicker() {
 }
 
 function onDateChange() {
+  materializeRecurringTasksUpTo(getSelectedDate());
   updateTodayBadge();
   updateTaskVisibility();
   renderList(); // refresh task cards for the newly selected date
@@ -3951,6 +4136,7 @@ initTheme();
 if (typeof Notification !== 'undefined' && Notification.permission === 'default') { Notification.requestPermission(); }
 checkUserNamePrompt();
 initDatePicker();
+materializeRecurringTasksUpTo(todayStr());
 renderList();
 restoreIntervals();
 updateLogPanel();
