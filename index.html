@@ -3460,6 +3460,55 @@ function handleCSVFile(input) {
   if (input.files[0]) processCSVFile(input.files[0]);
 }
 
+// Parse an entire CSV document into rows of fields, correctly handling commas
+// and newlines embedded inside quoted fields (e.g. a multi-line remark or
+// description). Returns an array of rows, each row an array of field strings.
+// This must be used instead of naively splitting the raw text on newlines,
+// which corrupts any row containing a quoted field with an embedded newline.
+function parseCSVDocument(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  const len = text.length;
+
+  while (i < len) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i+1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += ch; i++; continue;
+    } else {
+      if (ch === '"') { inQuotes = true; i++; continue; }
+      if (ch === ',') { row.push(field.trim()); field = ''; i++; continue; }
+      if (ch === '\r') {
+        // Bare CR (old Mac-style line ending) acts as its own row terminator.
+        // If followed by \n (CRLF), skip the \r and let the \n below end the row instead.
+        if (text[i+1] === '\n') { i++; continue; }
+        row.push(field.trim()); field = '';
+        rows.push(row); row = [];
+        i++; continue;
+      }
+      if (ch === '\n') {
+        row.push(field.trim()); field = '';
+        rows.push(row); row = [];
+        i++; continue;
+      }
+      field += ch; i++; continue;
+    }
+  }
+  // Flush the last field/row if the file doesn't end with a trailing newline
+  if (field.length > 0 || row.length > 0) {
+    row.push(field.trim());
+    rows.push(row);
+  }
+  // Drop fully blank rows (e.g. trailing empty line)
+  return rows.filter(r => r.some(f => f !== ''));
+}
+
 function processCSVFile(file) {
   const reader = new FileReader();
   reader.onload = ev => {
@@ -3467,9 +3516,10 @@ function processCSVFile(file) {
     const to   = document.getElementById('csv-import-to').value;
     const prev = document.getElementById('csv-import-preview');
     try {
-      const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
-      const header = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
-      const dataRows = lines.slice(1);
+      const allRows = parseCSVDocument(ev.target.result);
+      if (allRows.length === 0) throw new Error('Empty file');
+      const header = allRows[0].map(h => h.trim().replace(/^"|"$/g,''));
+      const dataRows = allRows.slice(1); // each is already an array of field values
 
       // Map column indices by header name. Primary alias is each column's CURRENT
       // configured label (so renamed columns map correctly); built-in columns also
@@ -3498,8 +3548,7 @@ function processCSVFile(file) {
         }
       });
       let imported = 0, skipped = 0;
-      dataRows.forEach(line => {
-        const vals = parseCSVLine(line);
+      dataRows.forEach(vals => {
         const getVal = (key) => (col[key] >= 0 ? (vals[col[key]] || '') : '');
         const dateStr = getVal('date');
 
