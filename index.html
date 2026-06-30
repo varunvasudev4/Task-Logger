@@ -290,6 +290,97 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
 .complete-select:focus, .complete-input:focus, .complete-textarea:focus { border-color: var(--green-mid); }
 .complete-select.invalid, .complete-input.invalid, .complete-textarea.invalid { border-color: var(--red-mid) !important; background: var(--red-bg); }
 .complete-textarea { resize: vertical; min-height: 72px; }
+.et-body-tpl { font-size: 12px; font-family: monospace; color: var(--text-primary); background: var(--bg-secondary); }
+
+#tour-backdrop.hidden { display: none; }
+#tour-bubble.hidden  { display: none; }
+/* Tour z-index stack:
+   10000 = backdrop
+   10100 = masters-modal during tour (above backdrop)
+   10101 = masters inner .modal (above backdrop)
+   10200 = tour bubble (topmost) */
+body.touring #masters-modal         { z-index: 10100 !important; }
+body.touring #masters-modal .modal  { z-index: 10101 !important; }
+#tour-backdrop {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,.5);
+  pointer-events: none;
+}
+#tour-bubble {
+  position: fixed; z-index: 10200;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0,0,0,.32);
+  pointer-events: all;
+}
+#tour-bubble-inner { padding: 20px 20px 16px; }
+#tour-step-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; font-weight: 500; letter-spacing: .3px; }
+#tour-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+#tour-body { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+#tour-body strong { color: var(--text-primary); }
+#tour-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.tour-highlight { outline: 3px solid var(--blue-mid) !important; outline-offset: 4px; border-radius: 4px; }
+#tour-arrow {
+  position: absolute; width: 14px; height: 14px;
+  background: var(--bg-primary); border: 1px solid var(--border-md);
+  transform: rotate(45deg);
+}
+.tour-arrow-up    { border-bottom: none; border-right: none; }
+.tour-arrow-down  { border-top: none; border-left: none; }
+.tour-arrow-left  { border-bottom: none; border-left: none; }
+.tour-arrow-right { border-top: none; border-right: none; }
+#task-search-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.35);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 80px;
+}
+#task-search-overlay.hidden { display: none; }
+#task-search-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0,0,0,.28);
+  width: min(680px, 94vw);
+  overflow: hidden;
+}
+.search-result-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 14px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover, .search-result-item.active { background: var(--bg-secondary); }
+.search-result-date {
+  font-size: 11px; color: var(--text-tertiary);
+  white-space: nowrap; padding-top: 2px; min-width: 72px;
+}
+.search-result-body { flex: 1; min-width: 0; }
+.search-result-heading {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.search-result-heading em { font-style: normal; color: var(--blue-mid); background: var(--blue-bg); border-radius: 2px; padding: 0 1px; }
+.search-result-meta {
+  font-size: 11px; color: var(--text-tertiary); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.search-empty { padding: 28px 16px; text-align: center; color: var(--text-tertiary); font-size: 13px; }
+.search-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--blue-bg); color: var(--blue-dark);
+  border: 1px solid var(--blue-mid); border-radius: 12px;
+  padding: 2px 8px 2px 10px; font-size: 12px; font-weight: 500;
+  white-space: nowrap; user-select: none;
+}
+.search-chip button {
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: var(--blue-mid); font-size: 14px; line-height: 1;
+  display: flex; align-items: center;
+}
+.search-chip button:hover { color: var(--red-mid); }
 .complete-row { display: flex; gap: 10px; }
 .complete-row .complete-field { flex: 1; }
 
@@ -641,6 +732,7 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
     </div>
     <div class="header-actions">
       <button class="btn" onclick="openCSVModal()"><i class="ti ti-file-text"></i> CSV</button>
+      <button class="btn" onclick="startTour()" id="tour-btn" title="App Tour"><i class="ti ti-route"></i> Tour</button>
       <div class="date-picker-wrap" onclick="try{document.getElementById('log-date-input').showPicker()}catch(e){document.getElementById('log-date-input').click()}">
         <i class="ti ti-calendar"></i>
         <input type="date" id="log-date-input" class="date-picker-input" onchange="onDateChange()" />
@@ -672,6 +764,7 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
       </div>
       <div class="log-header-actions">
         <button class="btn" onclick="copyLog()" id="copy-btn"><i class="ti ti-clipboard-copy"></i> Copy</button>
+        <button class="btn" onclick="openMailModal()" id="mail-btn" title="Send log via email"><i class="ti ti-mail"></i> Email</button>
         <button class="btn" onclick="clearLog()"><i class="ti ti-trash"></i> Clear log</button>
         <button class="btn btn-primary" onclick="exportXLSX()"><i class="ti ti-file-spreadsheet"></i> Download XLSX</button>
       </div>
@@ -884,9 +977,55 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
   </div>
 </div>
 
+<!-- Email Table Preview modal -->
+<div class="modal-overlay hidden" id="email-preview-modal">
+  <div class="modal" style="max-width:100vw;width:100vw;height:100vh;max-height:100vh;border-radius:0;margin:0;display:flex;flex-direction:column">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-table" style="vertical-align:-2px;margin-right:6px;color:var(--blue-mid)"></i>Select Rows to Copy</div>
+      <button class="btn-icon" onclick="closeEmailPreview()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px;flex:1;overflow:auto">
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+        Uncheck any rows you want to exclude from the copied table. Mail app will open simultaneously.
+      </div>
+      <div style="overflow-x:auto">
+        <table id="email-preview-table" style="width:100%;border-collapse:collapse;font-size:12px"></table>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn" onclick="emailPreviewToggleAll(true)"  style="font-size:11px;padding:4px 10px">Select All</button>
+        <button class="btn" onclick="emailPreviewToggleAll(false)" style="font-size:11px;padding:4px 10px">Deselect All</button>
+        <span id="email-preview-count" style="font-size:11px;color:var(--text-secondary)"></span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeEmailPreview()">Cancel</button>
+        <button class="btn btn-primary" onclick="copyEmailTableFromPreview()"><i class="ti ti-clipboard-copy"></i> Copy to Clipboard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Task Search overlay (Ctrl+E) -->
+<div id="task-search-overlay" class="hidden" onclick="if(event.target===this)closeSearch()">
+  <div id="task-search-box">
+    <div id="task-search-input-row" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border-md);flex-wrap:wrap;min-height:44px">
+      <i class="ti ti-search" style="font-size:16px;color:var(--text-tertiary);flex-shrink:0"></i>
+      <div id="task-search-chips" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;flex:1;min-width:0"></div>
+      <input id="task-search-input" type="text" placeholder="Type & press Enter to add keyword…"
+        autocomplete="off" spellcheck="false"
+        oninput="renderSearchResults()"
+        onkeydown="searchKeyNav(event)"
+        style="border:none;outline:none;background:transparent;font-size:13px;color:var(--text-primary);font-family:inherit;min-width:160px;flex:1" />
+      <span style="font-size:11px;color:var(--text-tertiary);white-space:nowrap">Esc to close</span>
+    </div>
+    <div id="task-search-results" style="overflow-y:auto;max-height:400px"></div>
+  </div>
+</div>
+
 <!-- Masters modal -->
 <div class="modal-overlay hidden" id="masters-modal">
-  <div class="modal" id="masters-modal-box" style="max-width:480px">
+  <div class="modal" id="masters-modal-box" style="max-width:560px">
     <div class="modal-header">
       <div class="modal-title"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:6px"></i>Edit Masters</div>
       <button class="btn-icon" onclick="closeMasters()"><i class="ti ti-x"></i></button>
@@ -898,6 +1037,8 @@ tbody td:first-child { color: var(--text-primary); font-weight: 500; }
         <button class="tab-btn" onclick="switchTab('columns')"><i class="ti ti-table" style="font-size:13px"></i> Columns</button>
         <button class="tab-btn" onclick="switchTab('weekends')">Weekends</button>
         <button class="tab-btn" onclick="switchTab('workhours')">Work Hours</button>
+        <button class="tab-btn" onclick="switchTab('email')"><i class="ti ti-mail" style="font-size:13px"></i> Email</button>
+        <button class="tab-btn" onclick="switchTab('data')"><i class="ti ti-database" style="font-size:13px"></i> Data</button>
       </div>
       <div id="masters-content"></div>
       <div id="master-add-section" class="master-add-row">
@@ -1121,7 +1262,16 @@ let masters = {
   // Single consolidated store for every list-type column's options — Projects, Nature of
   // Task, Status, and any custom list the user creates all live here side by side and are
   // all managed from the one "Lists" tab in Masters.
-  customLists: { projects: [...DEFAULT_PROJECTS], natures: [...DEFAULT_NATURES], statuses: [...DEFAULT_STATUSES] }
+  customLists: { projects: [...DEFAULT_PROJECTS], natures: [...DEFAULT_NATURES], statuses: [...DEFAULT_STATUSES] },
+  emailTemplate: {
+    to: 'akhilk@navareglobal.com',
+    cc: 'santhoshj@navaresolutions.co.nz, Arun@navareglobal.com, rony.t@navareglobal.com, nihalm@navaresolutions.co.nz, josmy.j@navareglobal.com, dimble.v@navareglobal.com',
+    subject: 'Status Update | {date}',
+    body: 'Hi Akhil,\nPlease see today\'s tasks,\n\n{log_table}\n\nRegards,\n{user}',
+    headerBg: '#1f4e78',
+    headerColor: '#ffffff',
+    reviewBeforeCopy: false
+  }
 };
 let activeMastersTab = 'lists';
 let activeListKey = 'projects'; // which list is selected inside the consolidated Lists tab
@@ -1204,6 +1354,18 @@ function loadState() {
         });
       }
       if (!masters.customLists || typeof masters.customLists !== 'object') masters.customLists = {};
+  if (!masters.emailTemplate || typeof masters.emailTemplate !== 'object') masters.emailTemplate = {
+    to: 'akhilk@navareglobal.com',
+    cc: 'santhoshj@navaresolutions.co.nz, Arun@navareglobal.com, rony.t@navareglobal.com, nihalm@navaresolutions.co.nz, josmy.j@navareglobal.com, dimble.v@navareglobal.com',
+    subject: 'Status Update | {date}',
+    body: 'Hi Akhil,\nPlease see today\'s tasks,\n\n{log_table}\n\nRegards,\n{user}',
+    headerBg: '#1f4e78',
+    headerColor: '#ffffff',
+    reviewBeforeCopy: false
+  };
+  if (!masters.emailTemplate.headerBg) masters.emailTemplate.headerBg = '#1f4e78';
+  if (!masters.emailTemplate.headerColor) masters.emailTemplate.headerColor = '#ffffff';
+  if (masters.emailTemplate.reviewBeforeCopy === undefined) masters.emailTemplate.reviewBeforeCopy = false;
       // Migrate legacy separate masters.projects / masters.natures arrays (from older saved
       // data) into the unified customLists store, then drop the old separate keys.
       if (Array.isArray(masters.projects)) {
@@ -2774,7 +2936,7 @@ function closeMasters() {
 }
 function switchTab(tab) {
   activeMastersTab = tab;
-  const TAB_ORDER = ['user','lists','columns','weekends','workhours'];
+  const TAB_ORDER = ['user','lists','columns','weekends','workhours','email','data'];
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
     b.classList.toggle('active', TAB_ORDER[i] === tab);
   });
@@ -2783,7 +2945,7 @@ function switchTab(tab) {
   // The Lists tab and Columns tab now have their own dedicated, self-contained controls.
   if (addSec) addSec.style.display = 'none';
   const box = document.getElementById('masters-modal-box');
-  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '480px';
+  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '560px';
   renderMastersContent();
 }
 // ── Columns tab: configure log table / task card columns ───────────────────
@@ -2983,6 +3145,134 @@ function renderMastersContent() {
   }
   if (activeMastersTab === 'lists') {
     content.innerHTML = renderListsTabHTML();
+    return;
+  }
+  if (activeMastersTab === 'email') {    const et = (masters.emailTemplate || {});
+    const cols = getVisibleLogColumns();
+    const colTokens = cols.map(c => `{${c.key}}`).join('  ');
+    content.innerHTML = `
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">
+        Set the default To, CC, Subject and body template for the Email Log button.
+        Use <code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">{date}</code>,
+        <code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">{user}</code>,
+        <code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">{total_mins}</code>,
+        <code style="background:var(--bg-secondary);padding:1px 4px;border-radius:3px">{log_table}</code>
+        in the body. Log column tokens: <span style="font-size:11px;word-break:break-all;color:var(--text-tertiary)">${colTokens}</span>
+      </div>
+      <div class="complete-field">
+        <label class="complete-label">To <span class="req">*</span></label>
+        <input class="complete-input" id="et-to" type="text" placeholder="recipient@example.com" value="${esc(et.to||'')}" style="width:100%" />
+      </div>
+      <div class="complete-field">
+        <label class="complete-label">CC</label>
+        <input class="complete-input" id="et-cc" type="text" placeholder="cc@example.com (optional)" value="${esc(et.cc||'')}" style="width:100%" />
+      </div>
+      <div class="complete-field">
+        <label class="complete-label">Subject</label>
+        <input class="complete-input" id="et-subject" type="text" placeholder="Effort Log – {user} – {date}" value="${esc(et.subject||'')}" style="width:100%" />
+      </div>
+      <div class="complete-field">
+        <label class="complete-label">Table Header Colour</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="et-header-bg" value="${esc(et.headerBg||'#1f4e78')}" style="width:44px;height:32px;padding:2px;border:1px solid var(--border-md);border-radius:var(--radius-md);cursor:pointer" />
+          <input class="complete-input" id="et-header-bg-hex" type="text" value="${esc(et.headerBg||'#1f4e78')}" style="width:100px" maxlength="7" placeholder="#1f4e78" />
+          <span style="font-size:11px;color:var(--text-tertiary)">Header background</span>
+        </div>
+      </div>
+      <div class="complete-field">
+        <label class="complete-label">Header Text Colour</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="et-header-color" value="${esc(et.headerColor||'#ffffff')}" style="width:44px;height:32px;padding:2px;border:1px solid var(--border-md);border-radius:var(--radius-md);cursor:pointer" />
+          <input class="complete-input" id="et-header-color-hex" type="text" value="${esc(et.headerColor||'#ffffff')}" style="width:100px" maxlength="7" placeholder="#ffffff" />
+          <span style="font-size:11px;color:var(--text-tertiary)">Header text colour</span>
+        </div>
+      </div>
+      <div class="complete-field">
+        <label class="complete-label">Body template</label>
+        <textarea class="complete-textarea et-body-tpl" id="et-body" rows="7">${esc(et.body||"Hi Akhil,\nPlease see today's tasks,\n\n{log_table}\n\nRegards,\n{user}")}</textarea>
+      </div>
+      <div class="complete-field" style="margin-top:4px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-primary)">
+          <input type="checkbox" id="et-review-before-copy" ${et.reviewBeforeCopy ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer" />
+          <span>Review &amp; select rows before copying table</span>
+        </label>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;margin-left:26px">When enabled, a preview modal appears so you can exclude rows before copying to clipboard.</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-primary" onclick="saveEmailTemplate()"><i class="ti ti-device-floppy"></i> Save Template</button>
+        <button class="btn" onclick="clearEmailTemplate()"><i class="ti ti-refresh"></i> Reset</button>
+      </div>
+      <div id="et-saved-msg" style="font-size:11px;color:var(--green-dark);margin-top:8px;display:none">✓ Saved</div>
+    `;
+    // Sync colour picker ↔ hex input
+    const cp = content.querySelector('#et-header-bg');
+    const hx = content.querySelector('#et-header-bg-hex');
+    if (cp && hx) {
+      cp.addEventListener('input', () => { hx.value = cp.value; });
+      hx.addEventListener('input', () => { if (/^#[0-9a-fA-F]{6}$/.test(hx.value)) cp.value = hx.value; });
+      hx.addEventListener('change', () => { if (/^#[0-9a-fA-F]{6}$/.test(hx.value)) cp.value = hx.value; });
+      const cp2 = content.querySelector('#et-header-color');
+      const hx2 = content.querySelector('#et-header-color-hex');
+      if (cp2 && hx2) {
+        cp2.addEventListener('input', () => { hx2.value = cp2.value; });
+        hx2.addEventListener('input', () => { if (/^#[0-9a-fA-F]{6}$/.test(hx2.value)) cp2.value = hx2.value; });
+        hx2.addEventListener('change', () => { if (/^#[0-9a-fA-F]{6}$/.test(hx2.value)) cp2.value = hx2.value; });
+      }
+    }
+    return;
+  }
+  if (activeMastersTab === 'data') {
+    const logCount = logEntries.length;
+    const taskCount = tasks.length;
+    const oldestTs = logEntries.length ? Math.min(...logEntries.map(e => e.startTs)) : null;
+    const oldestDate = oldestTs ? new Date(oldestTs).toLocaleDateString('en-GB') : '—';
+    const storageKB = Math.round(JSON.stringify({tasks, logEntries, masters}).length / 1024);
+    content.innerHTML = `
+      <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border-md);border-radius:var(--radius-md);padding:10px 16px;flex:1;min-width:120px">
+          <div style="font-size:11px;color:var(--text-tertiary)">Log Entries</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-primary)">${logCount}</div>
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border-md);border-radius:var(--radius-md);padding:10px 16px;flex:1;min-width:120px">
+          <div style="font-size:11px;color:var(--text-tertiary)">Tasks</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-primary)">${taskCount}</div>
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border-md);border-radius:var(--radius-md);padding:10px 16px;flex:1;min-width:120px">
+          <div style="font-size:11px;color:var(--text-tertiary)">Oldest Entry</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text-primary)">${oldestDate}</div>
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border-md);border-radius:var(--radius-md);padding:10px 16px;flex:1;min-width:120px">
+          <div style="font-size:11px;color:var(--text-tertiary)">Storage Used</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text-primary)">${storageKB} KB</div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border-md);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px"><i class="ti ti-download" style="vertical-align:-2px;margin-right:5px;color:var(--blue-mid)"></i>Backup — Export All Data</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Download a full JSON backup of all tasks, log history, and settings. Use this to transfer the app to another device.</div>
+        <button class="btn btn-primary" onclick="exportBackup()"><i class="ti ti-file-download"></i> Download Backup JSON</button>
+      </div>
+      <div style="border:1px solid var(--border-md);border-radius:var(--radius-md);padding:14px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px"><i class="ti ti-upload" style="vertical-align:-2px;margin-right:5px;color:var(--green-mid)"></i>Restore — Import Backup</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Import a previously exported backup JSON. <strong>This will overwrite all current data.</strong></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="btn" style="cursor:pointer"><i class="ti ti-file-upload"></i> Choose Backup File
+            <input type="file" accept=".json" style="display:none" onchange="importBackup(event)">
+          </label>
+          <span id="import-backup-status" style="font-size:12px;color:var(--text-secondary)"></span>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border-md);border-radius:var(--radius-md);padding:14px">
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px"><i class="ti ti-trash" style="vertical-align:-2px;margin-right:5px;color:var(--red-mid)"></i>History Cleanup</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Remove old log entries to free up storage. Active tasks are never deleted.</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--text-secondary)">Keep last</span>
+          <input class="complete-input" id="cleanup-days" type="number" min="1" max="3650" value="90" style="width:70px;text-align:center" />
+          <span style="font-size:12px;color:var(--text-secondary)">days</span>
+          <button class="btn" style="color:var(--red-dark);border-color:var(--red-mid)" onclick="runHistoryCleanup()"><i class="ti ti-trash"></i> Clean Up</button>
+        </div>
+        <div id="cleanup-status" style="font-size:12px;margin-top:8px;display:none"></div>
+      </div>
+    `;
     return;
   }
 }
@@ -3390,6 +3680,502 @@ function copyLog() {
     btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
     setTimeout(() => { btn.innerHTML = orig; }, 2000);
   });
+}
+
+
+// ── Email log ─────────────────────────────────────────────────────────────────
+function saveEmailTemplate() {
+  masters.emailTemplate = {
+    to:       (document.getElementById('et-to')         || {}).value?.trim() || '',
+    cc:       (document.getElementById('et-cc')         || {}).value?.trim() || '',
+    subject:  (document.getElementById('et-subject')    || {}).value?.trim() || '',
+    body:     (document.getElementById('et-body')       || {}).value || '',
+    headerBg: (() => {
+      const hex = (document.getElementById('et-header-bg-hex') || {}).value?.trim();
+      const cp  = (document.getElementById('et-header-bg')     || {}).value?.trim();
+      return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : (cp || '#1f4e78');
+    })(),
+    headerColor: (() => {
+      const hex = (document.getElementById('et-header-color-hex') || {}).value?.trim();
+      const cp  = (document.getElementById('et-header-color')     || {}).value?.trim();
+      return /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : (cp || '#ffffff');
+    })(),
+    reviewBeforeCopy: !!(document.getElementById('et-review-before-copy') || {}).checked
+  };
+  saveState();
+  const msg = document.getElementById('et-saved-msg');
+  if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 2000); }
+}
+
+function clearEmailTemplate() {
+  masters.emailTemplate = { to: '', cc: '', subject: '', body: '', headerBg: '#1f4e78', headerColor: '#ffffff', reviewBeforeCopy: false };
+  saveState();
+  renderMastersContent();
+}
+
+// store data needed by preview modal
+let _emailPreviewData = null;
+
+function openMailModal() {
+  const selDate = getSelectedDate();
+  const filtered = logEntries.filter(e => entryMatchesDate(e, selDate));
+  if (filtered.length === 0) { alert('No entries to email for this date.'); return; }
+
+  const et = masters.emailTemplate || {};
+  if (!et.to) {
+    const go = confirm('No email recipient set.\n\nClick OK to open Masters → Email tab to configure your email template, then try again.');
+    if (go) { openMasters(); switchTab('email'); }
+    return;
+  }
+
+  const d = new Date(selDate + 'T00:00:00');
+  const dateLabel = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+  const cols = getVisibleLogColumns();
+
+  const totalMins = filtered.reduce((s, e) => {
+    const task = tasks.find(t => t.id === e.taskId);
+    const secs = e.durationSecs !== null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+    return s + Math.ceil(secs / 60);
+  }, 0);
+
+  const rawBody = et.body || "Hi,\nPlease see today's tasks,\n\n{log_table}\n\nRegards,\n{user}";
+  const resolveSimpleTokens = str => str
+    .replace(/\{date\}/g, dateLabel)
+    .replace(/\{user\}/g, userName || '')
+    .replace(/\{total_mins\}/g, String(totalMins));
+
+  // Build header row and data rows
+  const headerRow = cols.map(c => c.label);
+  const dataRows  = filtered.map(e => {
+    const task = tasks.find(t => t.id === e.taskId);
+    return cols.map(c => {
+      if (c.key === 'effort') {
+        const secs = e.durationSecs !== null ? e.durationSecs : (task ? liveElapsedSecs(task) : 0);
+        return Math.ceil(secs / 60);
+      }
+      return getExportValueForColumn(e, task, c.key) || '';
+    });
+  });
+
+  // Build plain text body for mailto
+  const plainHeader = headerRow.join('\t');
+  const plainRows   = dataRows.map(r => r.join('\t'));
+  const plainTable  = [plainHeader, ...plainRows].join('\n');
+  const plainBody   = resolveSimpleTokens(rawBody).replace('{log_table}', plainTable);
+
+  // Open mail app immediately in parallel
+  const mailtoHref = 'mailto:' + encodeURIComponent(et.to)
+    + '?cc='      + encodeURIComponent(et.cc || '')
+    + '&subject=' + encodeURIComponent(resolveSimpleTokens(et.subject || 'Status Update | {date}'))
+    + '&body='    + encodeURIComponent(plainBody);
+  window.location.href = mailtoHref;
+
+  // Branch: show preview modal or copy directly based on master setting
+  _emailPreviewData = { headerRow, dataRows };
+  if ((masters.emailTemplate || {}).reviewBeforeCopy) {
+    _openEmailPreview();
+  } else {
+    _copyTableToClipboard(headerRow, dataRows);
+  }
+}
+
+function _openEmailPreview() {
+  const { headerRow, dataRows } = _emailPreviewData;
+  const et = masters.emailTemplate || {};
+  const hdrBg    = et.headerBg    || '#1f4e78';
+  const hdrColor = et.headerColor || '#ffffff';
+
+  const thStyle = [
+    'background:' + hdrBg,
+    'color:' + hdrColor,
+    'font-weight:bold',
+    'padding:6px 10px',
+    'border:1px solid ' + hdrBg,
+    'font-size:12px',
+    'text-align:left'
+  ].join(';');
+
+  const tdStyle = [
+    'padding:5px 10px',
+    'border:1px solid var(--border)',
+    'font-size:12px',
+    'color:var(--text-primary)',
+    'white-space:normal',
+    'word-wrap:break-word',
+    'overflow-wrap:break-word'
+  ].join(';');
+
+  const ckStyle = 'padding:5px 8px;border:1px solid var(--border);text-align:center;white-space:nowrap;';
+
+  const thead = `<thead><tr><th style="${thStyle};padding:6px 8px;text-align:center">✓</th>`
+    + headerRow.map(h => `<th style="${thStyle}">${h}</th>`).join('')
+    + '</tr></thead>';
+
+  const tbody = '<tbody>' + dataRows.map((row, i) =>
+    `<tr id="epr-row-${i}">` +
+    `<td style="${ckStyle}"><input type="checkbox" checked data-row="${i}" onchange="emailPreviewUpdateCount()"></td>` +
+    row.map(val => `<td style="${tdStyle}">${String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>`).join('') +
+    '</tr>'
+  ).join('') + '</tbody>';
+
+  document.getElementById('email-preview-table').style.cssText = 'width:100%;border-collapse:collapse;font-size:12px';
+  document.getElementById('email-preview-table').innerHTML = thead + tbody;
+  emailPreviewUpdateCount();
+  document.getElementById('email-preview-modal').classList.remove('hidden');
+}
+
+function emailPreviewUpdateCount() {
+  const checkboxes = document.querySelectorAll('#email-preview-table input[type=checkbox]');
+  const checked = [...checkboxes].filter(c => c.checked).length;
+  document.getElementById('email-preview-count').textContent = checked + ' of ' + checkboxes.length + ' rows selected';
+}
+
+function emailPreviewToggleAll(state) {
+  document.querySelectorAll('#email-preview-table input[type=checkbox]').forEach(c => c.checked = state);
+  emailPreviewUpdateCount();
+}
+
+function closeEmailPreview() {
+  document.getElementById('email-preview-modal').classList.add('hidden');
+  _emailPreviewData = null;
+}
+
+async function _copyTableToClipboard(headerRow, selectedRows) {
+  const et = masters.emailTemplate || {};
+  const hdrBg    = et.headerBg    || '#1f4e78';
+  const hdrColor = et.headerColor || '#ffffff';
+
+  const thStyle = [
+    'background-color:' + hdrBg,
+    'color:' + hdrColor,
+    'font-weight:bold',
+    'font-family:Calibri,Arial,sans-serif',
+    'font-size:11pt',
+    'padding:5px 8px',
+    'border:1px solid ' + hdrBg,
+    'white-space:nowrap'
+  ].join(';');
+
+  const tdStyle = [
+    'font-family:Calibri,Arial,sans-serif',
+    'font-size:11pt',
+    'padding:4px 8px',
+    'border:1px solid #b8cce4',
+    'vertical-align:top',
+    'white-space:nowrap',
+    'background-color:#ffffff'
+  ].join(';');
+
+  const thead = '<tr>' + headerRow.map(h =>
+    `<th style="${thStyle}"><span style="color:${hdrColor};font-weight:bold;mso-color-alt:windowtext">${h}</span></th>`
+  ).join('') + '</tr>';
+
+  const tbody = selectedRows.map(row =>
+    '<tr>' + row.map(val =>
+      `<td style="${tdStyle}">${String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>`
+    ).join('') + '</tr>'
+  ).join('');
+
+  const tableHtml = `<html><body><!--StartFragment--><table style="border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0"><thead>${thead}</thead><tbody>${tbody}</tbody></table><!--EndFragment--></body></html>`;
+  const tsv = [headerRow, ...selectedRows].map(r => r.join('\t')).join('\n');
+
+  await navigator.clipboard.write([
+    new ClipboardItem({
+      'text/html':  new Blob([tableHtml], { type: 'text/html'  }),
+      'text/plain': new Blob([tsv],       { type: 'text/plain' })
+    })
+  ]);
+}
+
+async function copyEmailTableFromPreview() {
+  const { headerRow, dataRows } = _emailPreviewData;
+  const checkboxes = [...document.querySelectorAll('#email-preview-table input[type=checkbox]')];
+  const selectedRows = dataRows.filter((_, i) => checkboxes[i]?.checked);
+  if (selectedRows.length === 0) { alert('No rows selected.'); return; }
+  try {
+    await _copyTableToClipboard(headerRow, selectedRows);
+    const btn = document.querySelector('#email-preview-modal .btn-primary');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+      btn.style.color = 'var(--green-dark)';
+      setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; closeEmailPreview(); }, 1500);
+    }
+  } catch(err) { alert('Clipboard copy failed: ' + err.message); }
+}
+
+// ── Data: Backup / Restore / Cleanup ──────────────────────────────────────────
+function exportBackup() {
+  const backup = {
+    _version: 1,
+    _exported: new Date().toISOString(),
+    tasks,
+    logEntries,
+    masters,
+    taskIdCounter,
+    importIdCounter,
+    recurringPlans,
+    recurringPlanIdCounter,
+    userName
+  };
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const d    = new Date();
+  const ds   = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+  a.href = url; a.download = `TTL_Backup_${ds}.json`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('import-backup-status');
+  if (status) status.textContent = 'Reading…';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const b = JSON.parse(e.target.result);
+      if (!b._version || !Array.isArray(b.tasks) || !Array.isArray(b.logEntries)) {
+        throw new Error('Invalid backup file format.');
+      }
+      if (!confirm(`This will replace ALL current data with the backup from ${b._exported ? new Date(b._exported).toLocaleString() : 'unknown date'}.\n\nAre you sure?`)) {
+        if (status) status.textContent = 'Cancelled.';
+        return;
+      }
+      // Restore all state
+      tasks                   = b.tasks                   || [];
+      logEntries              = b.logEntries              || [];
+      masters                 = b.masters                 || masters;
+      taskIdCounter           = b.taskIdCounter           ?? taskIdCounter;
+      importIdCounter         = b.importIdCounter         ?? importIdCounter;
+      recurringPlans          = b.recurringPlans          || [];
+      recurringPlanIdCounter  = b.recurringPlanIdCounter  ?? recurringPlanIdCounter;
+      if (b.userName) userName = b.userName;
+      saveState();
+      // Re-render everything
+      renderAll();
+      if (status) { status.style.color = 'var(--green-dark)'; status.textContent = `✓ Restored ${tasks.length} tasks and ${logEntries.length} log entries.`; }
+      setTimeout(() => switchTab('data'), 300);
+    } catch(err) {
+      if (status) { status.style.color = 'var(--red-mid)'; status.textContent = '✗ ' + err.message; }
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function runHistoryCleanup() {
+  const daysEl = document.getElementById('cleanup-days');
+  const days = parseInt(daysEl?.value || '90', 10);
+  if (isNaN(days) || days < 1) { alert('Please enter a valid number of days.'); return; }
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const before = logEntries.length;
+  // Keep entries newer than cutoff OR whose task is currently active
+  const activeTaskIds = new Set(tasks.filter(t => t.running || t.startedAt).map(t => t.id));
+  logEntries = logEntries.filter(e => e.startTs >= cutoff || activeTaskIds.has(e.taskId));
+  const removed = before - logEntries.length;
+  saveState();
+  const st = document.getElementById('cleanup-status');
+  if (st) {
+    st.style.display = 'block';
+    if (removed > 0) {
+      st.style.color = 'var(--green-dark)';
+      st.textContent = `✓ Removed ${removed} entr${removed===1?'y':'ies'} older than ${days} days. ${logEntries.length} entries remain.`;
+    } else {
+      st.style.color = 'var(--text-secondary)';
+      st.textContent = `No entries older than ${days} days found. Nothing removed.`;
+    }
+  }
+  renderMastersContent(); // refresh stats
+}
+let _searchActiveIdx = -1;
+let _searchKeywords = [];
+
+function openSearch() {
+  document.getElementById('task-search-overlay').classList.remove('hidden');
+  const inp = document.getElementById('task-search-input');
+  inp.value = '';
+  _searchKeywords = [];
+  _searchActiveIdx = -1;
+  renderSearchChips();
+  renderSearchResults();
+  setTimeout(() => inp.focus(), 30);
+}
+
+function closeSearch() {
+  document.getElementById('task-search-overlay').classList.add('hidden');
+}
+
+function addSearchKeyword() {
+  const inp = document.getElementById('task-search-input');
+  const kw = inp.value.trim();
+  if (kw && !_searchKeywords.includes(kw.toLowerCase())) {
+    _searchKeywords.push(kw.toLowerCase());
+  }
+  inp.value = '';
+  renderSearchChips();
+  renderSearchResults();
+  inp.focus();
+}
+
+function removeSearchKeyword(idx) {
+  _searchKeywords.splice(idx, 1);
+  renderSearchChips();
+  renderSearchResults();
+  document.getElementById('task-search-input').focus();
+}
+
+function renderSearchChips() {
+  const container = document.getElementById('task-search-chips');
+  container.innerHTML = _searchKeywords.map((kw, i) =>
+    `<span class="search-chip">${escHtml(kw)}<button onclick="removeSearchKeyword(${i})" title="Remove">×</button></span>`
+  ).join('');
+  // Update placeholder
+  const inp = document.getElementById('task-search-input');
+  inp.placeholder = _searchKeywords.length ? 'Add another keyword…' : 'Type & press Enter to add keyword…';
+}
+
+function renderSearchResults() {
+  const inp = document.getElementById('task-search-input');
+  const currentInput = (inp.value || '').trim().toLowerCase();
+  const container = document.getElementById('task-search-results');
+  _searchActiveIdx = -1;
+
+  // Combine committed keywords + current typed text
+  const allKws = [..._searchKeywords, ...(currentInput ? [currentInput] : [])];
+
+  if (!allKws.length) {
+    container.innerHTML = '<div class="search-empty">Type a keyword and press <strong>Enter</strong> to add it — combine multiple keywords to narrow results.</div>';
+    return;
+  }
+
+  // An entry matches if it contains ALL keywords (AND logic across keywords)
+  const fields = e => [e.heading, e.project, e.nature, e.ticket, e.description, e.module]
+    .map(v => (v || '').toLowerCase()).join(' ');
+
+  const hits = logEntries.filter(e => {
+    const text = fields(e);
+    return allKws.every(kw => text.includes(kw));
+  });
+
+  if (!hits.length) {
+    const kwDisplay = allKws.map(k => `<strong>${escHtml(k)}</strong>`).join(' + ');
+    container.innerHTML = `<div class="search-empty">No results matching ${kwDisplay}</div>`;
+    return;
+  }
+
+  const sorted = [...hits].sort((a, b) => b.startTs - a.startTs).slice(0, 80);
+
+  function highlight(str) {
+    if (!str) return '';
+    let s = escHtml(str);
+    // Highlight all keywords
+    allKws.forEach(kw => {
+      const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+      s = s.replace(re, m => `<em>${m}</em>`);
+    });
+    return s;
+  }
+
+  const kwBadges = _searchKeywords.map(kw =>
+    `<span style="display:inline-block;background:var(--blue-bg);color:var(--blue-dark);border:1px solid var(--blue-mid);border-radius:10px;font-size:10px;padding:0 6px;margin-right:4px">${escHtml(kw)}</span>`
+  ).join('');
+
+  const header = `<div style="padding:6px 14px;font-size:11px;color:var(--text-tertiary);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <span>${kwBadges}${hits.length} result${hits.length!==1?'s':''}</span>
+    ${_searchKeywords.length ? `<button class="btn" style="font-size:11px;padding:2px 8px" onclick="clearSearchKeywords()">Clear all</button>` : ''}
+  </div>`;
+
+  container.innerHTML = header + sorted.map((e, i) => {
+    const d = new Date(e.startTs);
+    const dateLabel = String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+    const entryDate = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const metaBadges = [
+      e.nature  ? `<span style="background:var(--green-bg);color:var(--green-dark);border:1px solid var(--green-mid);border-radius:10px;font-size:10px;padding:1px 7px">${highlight(e.nature)}</span>` : '',
+      e.ticket  ? `<span style="background:var(--amber-bg,#fff8e1);color:var(--amber-dark,#795900);border:1px solid var(--amber-mid,#f0b400);border-radius:10px;font-size:10px;padding:1px 7px">#${highlight(e.ticket)}</span>` : '',
+      e.project ? `<span style="font-size:11px;color:var(--text-secondary)">${highlight(e.project)}</span>` : '',
+    ].filter(Boolean).join(' ');
+    return `<div class="search-result-item" data-date="${entryDate}" onclick="jumpToDate('${entryDate}')" data-idx="${i}">
+      <div class="search-result-date">${dateLabel}</div>
+      <div class="search-result-body">
+        <div class="search-result-heading">${highlight(e.heading) || '<span style="color:var(--text-tertiary);font-style:italic">Untitled</span>'}</div>
+        ${metaBadges ? `<div class="search-result-meta" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:3px">${metaBadges}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearSearchKeywords() {
+  _searchKeywords = [];
+  document.getElementById('task-search-input').value = '';
+  renderSearchChips();
+  renderSearchResults();
+  document.getElementById('task-search-input').focus();
+}
+
+function jumpToDate(dateStr) {
+  const inp = document.getElementById('log-date-input');
+  if (inp) { inp.value = dateStr; onDateChange(); }
+  closeSearch();
+}
+
+function searchKeyNav(e) {
+  if (e.key === 'Enter') {
+    const inp = document.getElementById('task-search-input');
+    if (inp.value.trim()) {
+      e.preventDefault();
+      addSearchKeyword();
+      return;
+    }
+    // Enter with empty input + active result → jump
+    const active = document.querySelector('#task-search-results .search-result-item.active');
+    if (active) { active.click(); return; }
+    return;
+  }
+  if (e.key === 'Backspace') {
+    const inp = document.getElementById('task-search-input');
+    if (!inp.value && _searchKeywords.length) {
+      e.preventDefault();
+      removeSearchKeyword(_searchKeywords.length - 1);
+      return;
+    }
+  }
+  if (e.key === 'Escape') { closeSearch(); return; }
+
+  const items = document.querySelectorAll('#task-search-results .search-result-item');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _searchActiveIdx = Math.min(_searchActiveIdx + 1, items.length - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _searchActiveIdx = Math.max(_searchActiveIdx - 1, 0);
+  } else return;
+  items.forEach((el, i) => el.classList.toggle('active', i === _searchActiveIdx));
+  items[_searchActiveIdx]?.scrollIntoView({ block: 'nearest' });
+}
+
+// Ctrl+E keyboard shortcut
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+    e.preventDefault();
+    const overlay = document.getElementById('task-search-overlay');
+    if (overlay.classList.contains('hidden')) openSearch(); else closeSearch();
+  }
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('task-search-overlay');
+    if (!overlay.classList.contains('hidden')) closeSearch();
+  }
+});
+
+function escHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
 }
 
 
@@ -4194,5 +4980,153 @@ initBreakTimer();
 if (tasks.length === 0) addTask();
 
 </script>
+</body>
+
+<!-- Tour overlay -->
+<div id="tour-backdrop" class="hidden"></div>
+<div id="tour-bubble" class="hidden">
+  <div id="tour-bubble-inner">
+    <div id="tour-step-label"></div>
+    <div id="tour-title"></div>
+    <div id="tour-body"></div>
+    <div id="tour-footer">
+      <button class="btn" onclick="endTour()" id="tour-skip-btn">Skip Tour</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary" onclick="tourNext()" id="tour-next-btn">Next →</button>
+      </div>
+    </div>
+  </div>
+  <div id="tour-arrow"></div>
+</div>
+
+<script>
+const TOUR_STEPS = [
+  { target: null, pos: 'center', title: '👋 Welcome to Task Time Logger!', body: 'This quick tour covers every feature — toolbar, log, Masters tabs, and search. Click <strong>Next</strong> to begin or <strong>Skip Tour</strong> to exit.' },
+  { target: '.btn-primary[onclick="addTask()"]', pos: 'bottom', title: '➕ Add Task', body: 'Click <strong>Add Task</strong> to create a new task. Enter a name, pick a project and nature, then hit <strong>Start</strong> to begin timing.' },
+  { target: '#task-list', pos: 'bottom', title: '📋 Task List', body: 'Your active tasks appear here. Each card has a live <strong>timer</strong>, Start/Stop control, project, nature, module and ticket fields, plus action buttons.' },
+  { target: '.date-picker-wrap', pos: 'bottom', title: '📅 Date Navigation', body: 'Use the <strong>date picker</strong> or ‹ › arrows to switch days. The effort log below always shows entries for the selected date.' },
+  { target: '#log-tbody', pos: 'top', title: '📊 Effort Log', body: 'Completed task sessions appear here — task, project, nature, ticket, effort in minutes and timestamps.' },
+  { target: '#copy-btn', pos: 'top', title: '📋 Copy Log', body: 'Copy the effort log as a tab-separated table — paste directly into Excel or Google Sheets.' },
+  { target: '#mail-btn', pos: 'top', title: '✉️ Email Log', body: 'Opens your mail app pre-filled and simultaneously copies a styled Excel-compatible table to clipboard. Template is configured in Masters → Email.' },
+  { target: '#work-widget', pos: 'left', title: '⏱ Work & Break Tracker', body: 'Shows your <strong>total work time</strong> for today, updated live as timers run.' },
+  { target: '#theme-toggle-btn', pos: 'bottom', title: '🌙 Theme', body: 'Switch between <strong>Light</strong>, <strong>Dark</strong>, and <strong>System</strong> themes.' },
+  { target: 'button[onclick="openCSVModal()"]', pos: 'bottom', title: '📄 CSV', body: 'Export your log to a spreadsheet or import historical data, filtered by date range.' },
+  { target: '#tour-btn', pos: 'bottom', title: '🗺 Tour', body: 'Restart this tour anytime from the <strong>Tour</strong> button.' },
+  // Masters — open it
+  { target: 'button[onclick="openMasters()"]', pos: 'bottom', title: '⚙️ Masters', body: 'The <strong>Masters</strong> panel is your settings hub. Click Next to open it and explore each tab.', onNext: () => { openMasters(); } },
+  // Masters tabs
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → User', body: 'Set your <strong>display name</strong> — it appears in email signatures and log exports. Also toggle auto-pause on system sleep.', onShow: () => { openMasters(); switchTab('user'); } },
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Lists', body: 'Manage your <strong>Project</strong>, <strong>Nature</strong>, and <strong>Status</strong> dropdowns. Add, rename, remove or drag to reorder items.', onShow: () => { switchTab('lists'); } },
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Columns', body: 'Choose which columns appear in the <strong>Effort Log</strong> and in exports. Toggle visibility and drag to reorder.', onShow: () => { switchTab('columns'); } },
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Weekends', body: 'Mark your <strong>weekend days</strong>. They are visually highlighted in the date picker so you can navigate your work week quickly.', onShow: () => { switchTab('weekends'); } },
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Work Hours', body: 'Set your standard <strong>work start and end times</strong>. Used to track expected vs actual hours for the day.', onShow: () => { switchTab('workhours'); } },
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Email', body: 'Set the default <strong>To</strong>, <strong>CC</strong>, <strong>Subject</strong> and <strong>Body</strong> template for the Email button. Use tokens like <code>{date}</code>, <code>{user}</code>, <code>{log_table}</code>. Set header colours for the pasted table.', onShow: () => { switchTab('email'); } },
+  { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Data', body: '<strong>Backup</strong> all data as JSON to transfer to another device. <strong>Restore</strong> from a backup file. <strong>Clean up</strong> old history by keeping only the last N days of entries.', onShow: () => { switchTab('data'); } },
+  // Close Masters, Search, Done
+  { target: null, pos: 'center', title: '🔍 Search (Ctrl + E)', body: 'Press <strong>Ctrl+E</strong> anywhere to open task search. Add multiple keyword chips — results must match ALL keywords across all history.', onShow: () => { const m = document.getElementById('masters-modal'); if (m) m.classList.add('hidden'); } },
+  { target: null, pos: 'center', title: '🎉 All done!', body: 'Tour complete! Start with <strong>Add Task</strong> and log your first entry. Happy tracking!', isLast: true }
+];
+
+let _tourStep = 0, _tourHighlight = null;
+
+function startTour() {
+  _tourStep = 0;
+  document.body.classList.add('touring');
+  document.getElementById('tour-backdrop').classList.remove('hidden');
+  document.getElementById('tour-bubble').classList.remove('hidden');
+  showTourStep();
+}
+
+function endTour() {
+  document.body.classList.remove('touring');
+  document.getElementById('tour-backdrop').classList.add('hidden');
+  document.getElementById('tour-bubble').classList.add('hidden');
+  clearTourHighlight();
+  const m = document.getElementById('masters-modal');
+  if (m) m.classList.add('hidden');
+}
+
+function tourNext() {
+  const step = TOUR_STEPS[_tourStep];
+  if (step.isLast) { endTour(); return; }
+  if (step.onNext) step.onNext();
+  _tourStep++;
+  if (_tourStep >= TOUR_STEPS.length) { endTour(); return; }
+  showTourStep();
+}
+
+function clearTourHighlight() {
+  if (_tourHighlight) { _tourHighlight.classList.remove('tour-highlight'); _tourHighlight = null; }
+}
+
+function showTourStep() {
+  clearTourHighlight();
+  const step = TOUR_STEPS[_tourStep];
+  // Fire onShow hook after a short delay so modals/tabs can render
+  if (step.onShow) {
+    setTimeout(() => {
+      step.onShow();
+      // Re-position after tab content renders
+      if (step.target) {
+        setTimeout(() => {
+          const el = document.querySelector(step.target);
+          if (el) positionBubble(el, step.pos);
+        }, 300);
+      }
+    }, 50);
+  }
+  document.getElementById('tour-step-label').textContent = 'Step ' + (_tourStep + 1) + ' of ' + TOUR_STEPS.length;
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-body').innerHTML = step.body;
+  document.getElementById('tour-next-btn').textContent = step.isLast ? '✓ Finish' : 'Next →';
+  document.getElementById('tour-skip-btn').style.display = step.isLast ? 'none' : '';
+
+  const bubble = document.getElementById('tour-bubble');
+  const arrow  = document.getElementById('tour-arrow');
+
+  if (!step.target || step.pos === 'center') {
+    bubble.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,90vw)';
+    arrow.style.display = 'none';
+    return;
+  }
+  const el = document.querySelector(step.target);
+  if (!el) { _tourStep++; showTourStep(); return; }
+  el.classList.add('tour-highlight');
+  _tourHighlight = el;
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  setTimeout(() => positionBubble(el, step.pos), 200);
+}
+
+function positionBubble(el, pos) {
+  const bubble = document.getElementById('tour-bubble');
+  const arrow  = document.getElementById('tour-arrow');
+  const r = el.getBoundingClientRect();
+  const BW = 360, GAP = 14;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let top, left, aDir;
+
+  if (pos === 'bottom')     { top = r.bottom + GAP; left = r.left + r.width/2 - BW/2; aDir = 'up'; }
+  else if (pos === 'top')   { top = r.top - 180 - GAP; left = r.left + r.width/2 - BW/2; aDir = 'down'; }
+  else if (pos === 'left')  { top = r.top + r.height/2 - 90; left = r.left - BW - GAP; aDir = 'right'; }
+  else                      { top = r.top + r.height/2 - 90; left = r.right + GAP; aDir = 'left'; }
+
+  left = Math.max(10, Math.min(left, vw - BW - 10));
+  top  = Math.max(10, Math.min(top,  vh - 200 - 10));
+  bubble.style.cssText = 'position:fixed;top:'+top+'px;left:'+left+'px;width:'+BW+'px;transform:none';
+
+  arrow.style.display = 'block';
+  arrow.className = 'tour-arrow-' + aDir;
+  const br = bubble.getBoundingClientRect();
+  if (aDir === 'up')    { arrow.style.cssText = 'top:-8px;left:'+Math.max(16,Math.min(r.left+r.width/2-br.left,BW-32))+'px'; }
+  if (aDir === 'down')  { arrow.style.cssText = 'bottom:-8px;left:'+Math.max(16,Math.min(r.left+r.width/2-br.left,BW-32))+'px'; }
+  if (aDir === 'right') { arrow.style.cssText = 'right:-8px;top:'+Math.max(16,Math.min(r.top+r.height/2-br.top,160))+'px'; }
+  if (aDir === 'left')  { arrow.style.cssText = 'left:-8px;top:'+Math.max(16,Math.min(r.top+r.height/2-br.top,160))+'px'; }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('tour-backdrop').classList.contains('hidden')) endTour();
+});
+</script>
+
 </body>
 </html>
