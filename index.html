@@ -27,7 +27,6 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.error(err));
   });
 }
-</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -986,7 +985,7 @@ body.touring #masters-modal .modal  { z-index: 10101 !important; }
     </div>
     <div class="modal-body" style="padding:12px 16px;flex:1;overflow:auto">
       <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
-        Uncheck any rows you want to exclude from the copied table. Mail app will open simultaneously.
+        Uncheck any rows you want to exclude, then click Copy. Your mail app will open right after copying.
       </div>
       <div style="overflow-x:auto">
         <table id="email-preview-table" style="width:100%;border-collapse:collapse;font-size:12px"></table>
@@ -3763,18 +3762,20 @@ function openMailModal() {
   const plainTable  = [plainHeader, ...plainRows].join('\n');
   const plainBody   = resolveSimpleTokens(rawBody).replace('{log_table}', plainTable);
 
-  // Open mail app immediately in parallel
+  // Build mailto href (used immediately, or after review+copy)
   const mailtoHref = 'mailto:' + encodeURIComponent(et.to)
     + '?cc='      + encodeURIComponent(et.cc || '')
     + '&subject=' + encodeURIComponent(resolveSimpleTokens(et.subject || 'Status Update | {date}'))
     + '&body='    + encodeURIComponent(plainBody);
-  window.location.href = mailtoHref;
 
-  // Branch: show preview modal or copy directly based on master setting
-  _emailPreviewData = { headerRow, dataRows };
-  if ((masters.emailTemplate || {}).reviewBeforeCopy) {
+  _emailPreviewData = { headerRow, dataRows, mailtoHref };
+
+  if (et.reviewBeforeCopy) {
+    // Review first — mail app opens only after user clicks Copy to Clipboard
     _openEmailPreview();
   } else {
+    // No review needed — open mail immediately and copy silently in parallel
+    window.location.href = mailtoHref;
     _copyTableToClipboard(headerRow, dataRows);
   }
 }
@@ -3888,16 +3889,18 @@ async function _copyTableToClipboard(headerRow, selectedRows) {
 }
 
 async function copyEmailTableFromPreview() {
-  const { headerRow, dataRows } = _emailPreviewData;
+  const { headerRow, dataRows, mailtoHref } = _emailPreviewData;
   const checkboxes = [...document.querySelectorAll('#email-preview-table input[type=checkbox]')];
   const selectedRows = dataRows.filter((_, i) => checkboxes[i]?.checked);
   if (selectedRows.length === 0) { alert('No rows selected.'); return; }
   try {
     await _copyTableToClipboard(headerRow, selectedRows);
+    // Open mail app now that the table is copied
+    if (mailtoHref) window.location.href = mailtoHref;
     const btn = document.querySelector('#email-preview-modal .btn-primary');
     if (btn) {
       const orig = btn.innerHTML;
-      btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+      btn.innerHTML = '<i class="ti ti-check"></i> Copied! Opening mail…';
       btn.style.color = 'var(--green-dark)';
       setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; closeEmailPreview(); }, 1500);
     }
