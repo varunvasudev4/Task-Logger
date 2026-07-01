@@ -1005,7 +1005,7 @@ body.touring #masters-modal .modal  { z-index: 10101 !important; }
   </div>
 </div>
 
-<!-- Task Search overlay (Ctrl+E) -->
+<!-- Task Search overlay (Ctrl+Shift+F) -->
 <div id="task-search-overlay" class="hidden" onclick="if(event.target===this)closeSearch()">
   <div id="task-search-box">
     <div id="task-search-input-row" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border-md);flex-wrap:wrap;min-height:44px">
@@ -1024,7 +1024,7 @@ body.touring #masters-modal .modal  { z-index: 10101 !important; }
 
 <!-- Masters modal -->
 <div class="modal-overlay hidden" id="masters-modal">
-  <div class="modal" id="masters-modal-box" style="max-width:560px">
+  <div class="modal" id="masters-modal-box" style="max-width:480px">
     <div class="modal-header">
       <div class="modal-title"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:6px"></i>Edit Masters</div>
       <button class="btn-icon" onclick="closeMasters()"><i class="ti ti-x"></i></button>
@@ -2944,7 +2944,7 @@ function switchTab(tab) {
   // The Lists tab and Columns tab now have their own dedicated, self-contained controls.
   if (addSec) addSec.style.display = 'none';
   const box = document.getElementById('masters-modal-box');
-  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '560px';
+  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '480px';
   renderMastersContent();
 }
 // ── Columns tab: configure log table / task card columns ───────────────────
@@ -4162,9 +4162,9 @@ function searchKeyNav(e) {
   items[_searchActiveIdx]?.scrollIntoView({ block: 'nearest' });
 }
 
-// Ctrl+E keyboard shortcut
+// Ctrl+Shift+F keyboard shortcut (Ctrl+E is reserved by Chrome/Brave for address bar search)
 document.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
     e.preventDefault();
     const overlay = document.getElementById('task-search-overlay');
     if (overlay.classList.contains('hidden')) openSearch(); else closeSearch();
@@ -5026,7 +5026,7 @@ const TOUR_STEPS = [
   { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Email', body: 'Set the default <strong>To</strong>, <strong>CC</strong>, <strong>Subject</strong> and <strong>Body</strong> template for the Email button. Use tokens like <code>{date}</code>, <code>{user}</code>, <code>{log_table}</code>. Set header colours for the pasted table.', onShow: () => { switchTab('email'); } },
   { target: '#masters-content', pos: 'right', title: '⚙️ Masters → Data', body: '<strong>Backup</strong> all data as JSON to transfer to another device. <strong>Restore</strong> from a backup file. <strong>Clean up</strong> old history by keeping only the last N days of entries.', onShow: () => { switchTab('data'); } },
   // Close Masters, Search, Done
-  { target: null, pos: 'center', title: '🔍 Search (Ctrl + E)', body: 'Press <strong>Ctrl+E</strong> anywhere to open task search. Add multiple keyword chips — results must match ALL keywords across all history.', onShow: () => { const m = document.getElementById('masters-modal'); if (m) m.classList.add('hidden'); } },
+  { target: null, pos: 'center', title: '🔍 Search (Ctrl + Shift + F)', body: 'Press <strong>Ctrl+Shift+F</strong> anywhere to open task search. Add multiple keyword chips — results must match ALL keywords across all history.', onShow: () => { const m = document.getElementById('masters-modal'); if (m) m.classList.add('hidden'); } },
   { target: null, pos: 'center', title: '🎉 All done!', body: 'Tour complete! Start with <strong>Add Task</strong> and log your first entry. Happy tracking!', isLast: true }
 ];
 
