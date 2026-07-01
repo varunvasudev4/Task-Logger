@@ -27,6 +27,7 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.error(err));
   });
 }
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1024,7 +1025,7 @@ body.touring #masters-modal .modal  { z-index: 10101 !important; }
 
 <!-- Masters modal -->
 <div class="modal-overlay hidden" id="masters-modal">
-  <div class="modal" id="masters-modal-box" style="max-width:480px">
+  <div class="modal" id="masters-modal-box" style="max-width:560px">
     <div class="modal-header">
       <div class="modal-title"><i class="ti ti-settings" style="vertical-align:-2px;margin-right:6px"></i>Edit Masters</div>
       <button class="btn-icon" onclick="closeMasters()"><i class="ti ti-x"></i></button>
@@ -2944,7 +2945,7 @@ function switchTab(tab) {
   // The Lists tab and Columns tab now have their own dedicated, self-contained controls.
   if (addSec) addSec.style.display = 'none';
   const box = document.getElementById('masters-modal-box');
-  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '480px';
+  if (box) box.style.maxWidth = (tab === 'columns' || tab === 'lists') ? '600px' : '560px';
   renderMastersContent();
 }
 // ── Columns tab: configure log table / task card columns ───────────────────
